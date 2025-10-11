@@ -101,10 +101,6 @@ const userSchema: Schema<IUser> = new Schema({
     timestamps: true
 });
 
-userSchema.index({ email: 1 });
-userSchema.index({ phone_no: 1 });
-userSchema.index({ uid: 1 });
-
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();
 

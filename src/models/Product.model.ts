@@ -183,8 +183,6 @@ const productSchema: Schema<IProduct> = new Schema({
 
 // Index for better query performance
 productSchema.index({ seller_id: 1, stock_id: 1 }, { unique: true });
-productSchema.index({ pid: 1 });
-productSchema.index({ product_id: 1 });
 productSchema.index({ shape: 1 });
 productSchema.index({ color: 1 });
 productSchema.index({ clarity: 1 });

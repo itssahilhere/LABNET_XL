@@ -87,7 +87,6 @@ const paymentLogSchema: Schema<IPaymentLog> = new Schema({
 // Index for better query performance
 paymentLogSchema.index({ user_id: 1, payment_status: 1 });
 paymentLogSchema.index({ pack_id: 1 });
-paymentLogSchema.index({ payment_id: 1 });
 paymentLogSchema.index({ stripe_session_id: 1 });
 paymentLogSchema.index({ stripe_customer_id: 1 });
 paymentLogSchema.index({ payment_status: 1 });
