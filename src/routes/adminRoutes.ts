@@ -36,16 +36,6 @@ router.put('/users/:userId/role',
     (req: Request, res: Response) => adminController.updateUserRole(req, res)
 );
 
-// GET /api/admin/users/:userId/secure-file-url - Get secure URL for specific user's ID proof
-router.get('/users/:userId/secure-file-url',
-    (req: Request, res: Response) => adminController.getUserSecureFileUrl(req, res)
-);
-
-// GET /api/admin/users/secure-file-urls - Get secure URLs for all users with ID proofs
-router.get('/users/secure-file-urls',
-    (req: Request, res: Response) => adminController.getAllUsersSecureFileUrls(req, res)
-);
-
 // GET /api/admin/users/with-files - Get users with file filter options
 router.get('/users/with-files',
     (req: Request, res: Response) => adminController.getUsersWithFiles(req, res)

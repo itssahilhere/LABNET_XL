@@ -4,7 +4,7 @@ import User from '../models/User.model';
 import { IRegisterRequest, IRegisterResponse } from '../interfaces/user';
 import { S3UploadRequest } from '../interfaces/fileUpload';
 import { logError } from '../utils/logger';
-import { uploadFiles, generatePresignedUrl, extractS3KeyFromUrl } from '../utils/fileUpload';
+import { uploadFiles } from '../utils/fileUpload';
 import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
 import { hashPassword } from '../utils/password';
 
@@ -285,40 +285,6 @@ export class UserController {
                 userId: req.user?._id || 'unknown',
                 functionName: 'updateProfile',
                 errorMsg: `Profile update failed: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-    // Get secure URL for user's ID proof document
-    public async getSecureFileUrl(req: Request, res: Response): Promise<Response> {
-        try {
-            const user = req.user;
-            if (!user) {
-                return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
-            }
-
-            if (!user.id_proof) {
-                return sendErrorResponse(res, ErrorResponses.NOT_FOUND('No ID proof document found'));
-            }
-
-            // Extract S3 key from the stored URL
-            const s3Key = extractS3KeyFromUrl(user.id_proof);
-            
-            // Generate pre-signed URL (valid for 1 hour)
-            const secureUrl = await generatePresignedUrl(s3Key, 3600);
-
-            return sendSuccessResponse(res, SuccessResponses.OK('Secure URL generated successfully', {
-                secureUrl: secureUrl,
-                expiresIn: 3600, // seconds
-                fileName: s3Key.split('/').pop() // Extract filename from key
-            }));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getSecureFileUrl',
-                errorMsg: `Secure URL generation failed: ${error.message}`
             });
             return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
         }

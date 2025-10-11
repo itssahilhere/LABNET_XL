@@ -3,18 +3,15 @@ import { IApprovalRequest, IRoleUpdateRequest } from '../interfaces/user';
 import { logError } from '../utils/logger';
 import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
 import { AdminUserService } from '../services/AdminUserService';
-import { AdminFileService } from '../services/AdminFileService';
 import { AdminDashboardService } from '../services/AdminDashboardService';
 import Package from '../models/Package.model';
 
 export class AdminController {
     private adminUserService: AdminUserService;
-    private adminFileService: AdminFileService;
     private adminDashboardService: AdminDashboardService;
 
     constructor() {
         this.adminUserService = new AdminUserService();
-        this.adminFileService = new AdminFileService();
         this.adminDashboardService = new AdminDashboardService();
     }
 
@@ -144,49 +141,6 @@ export class AdminController {
                 errorMsg: `Failed to update user role: ${error.message}`
             });
             return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
-        }
-    }
-
-    // Get secure URL for specific user's ID proof document
-    public async getUserSecureFileUrl(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const { userId } = req.params;
-            const adminId = req.user._id;
-
-            const result = await this.adminFileService.getUserSecureFileUrl(userId, adminId);
-            return sendSuccessResponse(res, SuccessResponses.OK('Secure URL generated successfully', result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getUserSecureFileUrl',
-                errorMsg: `Failed to generate secure URL: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
-        }
-    }
-
-    // Get secure URLs for all users with ID proof documents
-    public async getAllUsersSecureFileUrls(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 20;
-            const adminId = req.user._id;
-
-            const result = await this.adminFileService.getAllUsersSecureFileUrls(page, limit, adminId);
-            return sendSuccessResponse(res, SuccessResponses.OK('Secure URLs generated successfully', result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getAllUsersSecureFileUrls',
-                errorMsg: `Failed to generate secure URLs: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
         }
     }
 

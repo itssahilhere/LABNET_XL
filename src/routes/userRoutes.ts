@@ -27,9 +27,4 @@ router.put('/profile',
   (req: Request, res: Response) => userController.updateProfile(req, res)
 );
 
-router.get('/secure-file-url',
-  authenticateToken,
-  (req: Request, res: Response) => userController.getSecureFileUrl(req, res)
-);
-
 export default router;

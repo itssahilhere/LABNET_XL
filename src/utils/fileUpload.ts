@@ -1,8 +1,6 @@
 import dotenv from 'dotenv';
 import { Request } from 'express';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 
 // Load environment variables
@@ -97,35 +95,6 @@ export async function uploadFiles(req: Request, fileType: string): Promise<{ url
   
   console.log(`All generated URLs for ${fileType}:`, s3ImagesUrl);
   return { urls: s3ImagesUrl };
-}
-
-// Generate pre-signed URL for secure file access
-export async function generatePresignedUrl(fileKey: string, expiresIn: number = 3600): Promise<string> {
-  try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME!,
-      Key: fileKey,
-    });
-    
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
-    return signedUrl;
-  } catch (error: any) {
-    console.error('Error generating pre-signed URL:', error);
-    throw { code: 500, message: `Failed to generate secure URL: ${error.message || 'Unknown error'}` };
-  }
-}
-
-export function extractS3KeyFromUrl(s3Url: string): string {
-  const urlParts = s3Url.split('/');
-  const bucketName = process.env.AWS_BUCKET_NAME!;
-  const bucketIndex = s3Url.indexOf(`${bucketName}.s3.`);
-  
-  if (bucketIndex === -1) {
-    throw new Error('Invalid S3 URL format');
-  }
-  
-  const keyStartIndex = s3Url.indexOf('/', bucketIndex + bucketName.length + '.s3.amazonaws.com/'.length);
-  return s3Url.substring(keyStartIndex + 1);
 }
 
 export { s3Client };
