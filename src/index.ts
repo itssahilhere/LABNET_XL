@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import apiRoutes from './routes/apiRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 import { errorHandler } from './middleware/validation.js';
 import { logSuccess, logError } from './utils/logger.js';
 import { initializeDatabase } from './utils/seeder.js';
@@ -23,6 +25,11 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+
+// Webhook routes (before JSON parsing middleware)
+app.use('/webhooks', webhookRoutes);
+
+// JSON parsing middleware (after webhooks)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -51,6 +58,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', apiRoutes);
 
 // Root route
 app.get('/', (req, res) => {

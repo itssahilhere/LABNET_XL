@@ -5,6 +5,7 @@ import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponse
 import { AdminUserService } from '../services/AdminUserService';
 import { AdminFileService } from '../services/AdminFileService';
 import { AdminDashboardService } from '../services/AdminDashboardService';
+import Package from '../models/Package.model';
 
 export class AdminController {
     private adminUserService: AdminUserService;
@@ -207,6 +208,196 @@ export class AdminController {
                 userId: req.user?._id || 'unknown',
                 functionName: 'getUsersWithFiles',
                 errorMsg: `Failed to get users with files: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    // ==================== Package Management ====================
+
+    /**
+     * Create a new package
+     * POST /api/admin/packages
+     * Body: { name, amount, pack_type, duration_days, max_products, features }
+     */
+    async createPackage(req: Request, res: Response) {
+        try {
+            const { name, amount, pack_type, duration_days, max_products, features } = req.body;
+
+            // Validation
+            if (!name || !amount || !pack_type || !duration_days) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Name, amount, pack_type, and duration_days are required'));
+            }
+
+            if (amount < 0) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Amount must be a positive number'));
+            }
+
+            if (duration_days < 1) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Duration days must be at least 1'));
+            }
+
+            const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+            if (!validPackTypes.includes(pack_type.toLowerCase())) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`));
+            }
+
+            // Check if package with same name already exists
+            const existingPackage = await Package.findOne({ name: name.trim() });
+            if (existingPackage) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Package with this name already exists'));
+            }
+
+            // Create new package
+            const newPackage = await Package.create({
+                name: name.trim(),
+                amount: Number(amount),
+                pack_type: pack_type.toLowerCase(),
+                duration_days: Number(duration_days),
+                max_products: max_products ? Number(max_products) : undefined,
+                features: features || [],
+                createdAt: new Date(),
+                updatedAt: new Date()
+            });
+
+            logError({
+                userId: req.user?._id || 'admin',
+                functionName: 'createPackage',
+                errorMsg: `Package created: ${newPackage._id}`
+            });
+
+            return sendSuccessResponse(res, SuccessResponses.CREATED('Package created successfully', newPackage));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'createPackage',
+                errorMsg: `Failed to create package: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    /**
+     * Update an existing package
+     * PUT /api/admin/packages/:id
+     * Body: { name?, amount?, pack_type?, duration_days?, max_products?, features? }
+     */
+    async updatePackage(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { name, amount, pack_type, duration_days, max_products, features } = req.body;
+
+            // Find package
+            const packageToUpdate = await Package.findById(id);
+            if (!packageToUpdate) {
+                return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
+            }
+
+            // Validation
+            if (amount !== undefined && amount < 0) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Amount must be a positive number'));
+            }
+
+            if (duration_days !== undefined && duration_days < 1) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Duration days must be at least 1'));
+            }
+
+            const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+            if (pack_type !== undefined && !validPackTypes.includes(pack_type.toLowerCase())) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`));
+            }
+
+            // Check if new name conflicts with existing package
+            if (name && name.trim() !== packageToUpdate.name) {
+                const existingPackage = await Package.findOne({ name: name.trim(), _id: { $ne: id } });
+                if (existingPackage) {
+                    return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Package with this name already exists'));
+                }
+            }
+
+            // Update fields
+            if (name !== undefined) packageToUpdate.name = name.trim();
+            if (amount !== undefined) packageToUpdate.amount = Number(amount);
+            if (pack_type !== undefined) packageToUpdate.pack_type = pack_type.toLowerCase();
+            if (duration_days !== undefined) packageToUpdate.duration_days = Number(duration_days);
+            if (max_products !== undefined) packageToUpdate.max_products = max_products ? Number(max_products) : null;
+            if (features !== undefined) packageToUpdate.features = features;
+            packageToUpdate.updatedAt = new Date();
+
+            await packageToUpdate.save();
+
+            logError({
+                userId: req.user?._id || 'admin',
+                functionName: 'updatePackage',
+                errorMsg: `Package updated: ${packageToUpdate._id}`
+            });
+
+            return sendSuccessResponse(res, SuccessResponses.OK('Package updated successfully', packageToUpdate));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'updatePackage',
+                errorMsg: `Failed to update package: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    /**
+     * Delete a package
+     * DELETE /api/admin/packages/:id
+     */
+    async deletePackage(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+
+            // Find and delete package
+            const deletedPackage = await Package.findByIdAndDelete(id);
+            if (!deletedPackage) {
+                return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
+            }
+
+            logError({
+                userId: req.user?._id || 'admin',
+                functionName: 'deletePackage',
+                errorMsg: `Package deleted: ${deletedPackage._id}`
+            });
+
+            return sendSuccessResponse(res, SuccessResponses.OK('Package deleted successfully', { 
+                id: deletedPackage._id,
+                name: deletedPackage.name 
+            }));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'deletePackage',
+                errorMsg: `Failed to delete package: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    /**
+     * Get all packages (for admin management)
+     * GET /api/admin/packages
+     */
+    async getAllPackages(req: Request, res: Response) {
+        try {
+            const packages = await Package.find().sort({ createdAt: -1 });
+            
+            return sendSuccessResponse(res, SuccessResponses.OK('Packages retrieved successfully', {
+                total: packages.length,
+                packages
+            }));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'getAllPackages',
+                errorMsg: `Failed to get packages: ${error.message}`
             });
             return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
         }

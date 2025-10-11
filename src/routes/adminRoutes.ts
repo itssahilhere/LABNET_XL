@@ -51,4 +51,25 @@ router.get('/users/with-files',
     (req: Request, res: Response) => adminController.getUsersWithFiles(req, res)
 );
 
+
+// GET /api/admin/packages - Get all packages
+router.get('/packages',
+    (req: Request, res: Response) => adminController.getAllPackages(req, res)
+);
+
+// POST /api/admin/packages - Create a new package
+router.post('/packages',
+    (req: Request, res: Response) => adminController.createPackage(req, res)
+);
+
+// PUT /api/admin/packages/:id - Update a package
+router.put('/packages/:id',
+    (req: Request, res: Response) => adminController.updatePackage(req, res)
+);
+
+// DELETE /api/admin/packages/:id - Delete a package
+router.delete('/packages/:id',
+    (req: Request, res: Response) => adminController.deletePackage(req, res)
+);
+
 export default router;

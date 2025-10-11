@@ -6,6 +6,7 @@ import { S3UploadRequest } from '../interfaces/fileUpload';
 import { logError } from '../utils/logger';
 import { uploadFiles, generatePresignedUrl, extractS3KeyFromUrl } from '../utils/fileUpload';
 import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
+import { hashPassword } from '../utils/password';
 
 export class UserController {
     // Register new user
@@ -123,17 +124,18 @@ export class UserController {
             const user = await User.findByCredentials(email, password);
             const token = user.generateAuthToken();
 
-            return res.json({
-                message: 'Login successful',
+            return sendSuccessResponse(res, SuccessResponses.OK('Login successful', {
                 user: {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
                     company_name: user.company_name,
-                    uid: user.uid
+                    uid: user.uid,
+                    role: user.role,
+                    approval_status: user.approval_status
                 },
                 token: token
-            });
+            }));
 
         } catch (error: any) {
             return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED(error.message));
@@ -149,25 +151,24 @@ export class UserController {
                 return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
             }
 
-            return res.json({
-                message: 'Profile retrieved successfully',
-                user: {
-                    _id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    company_name: user.company_name,
-                    location: user.location,
-                    phone_no: user.phone_no,
-                    whatsapp_no: user.whatsapp_no,
-                    uid: user.uid,
-                    kyc: user.kyc,
-                    vat_number: user.vat_number,
-                    id_proof: user.id_proof,
-                    enable: user.enable,
-                    pack_start_date: user.pack_start_date,
-                    pack_end_date: user.pack_end_date
-                }
-            });
+            return sendSuccessResponse(res, SuccessResponses.OK('Profile retrieved successfully', {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                company_name: user.company_name,
+                location: user.location,
+                phone_no: user.phone_no,
+                whatsapp_no: user.whatsapp_no,
+                uid: user.uid,
+                kyc: user.kyc,
+                vat_number: user.vat_number,
+                id_proof: user.id_proof,
+                enable: user.enable,
+                role: user.role,
+                approval_status: user.approval_status,
+                pack_start_date: user.pack_start_date,
+                pack_end_date: user.pack_end_date
+            }));
 
         } catch (error: any) {
             logError({
@@ -188,13 +189,57 @@ export class UserController {
             }
 
             const updates = req.body;
-            const allowedUpdates = ['name', 'company_name', 'location', 'whatsapp_no', 'vat_number'];
-            const updateKeys = Object.keys(updates).filter(key => key !== 'fileDetails');
+            const allowedUpdates = ['name', 'company_name', 'location', 'email', 'phone_no', 'whatsapp_no', 'vat_number', 'password'];
+            const updateKeys = Object.keys(updates).filter(key => key !== 'fileDetails' && key !== 'id_proof');
 
             // Check if all update keys are allowed
             const isValidOperation = updateKeys.every(update => allowedUpdates.includes(update));
             if (!isValidOperation) {
                 return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Invalid updates'));
+            }
+
+            // Prevent direct update of id_proof field (must use fileDetails for S3 upload)
+            if (updates.id_proof) {
+                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('ID proof cannot be updated directly. Please use file upload.'));
+            }
+
+            // Check if email is being updated and already exists
+            if (updates.email && updates.email !== user.email) {
+                const existingEmail = await User.findOne({ 
+                    email: updates.email, 
+                    _id: { $ne: user._id } 
+                });
+                if (existingEmail) {
+                    return sendErrorResponse(res, ErrorResponses.CONFLICT('Email already exists'));
+                }
+            }
+
+            // Check if phone number is being updated and already exists
+            if (updates.phone_no && updates.phone_no !== user.phone_no) {
+                const existingPhone = await User.findOne({ 
+                    phone_no: updates.phone_no, 
+                    _id: { $ne: user._id } 
+                });
+                if (existingPhone) {
+                    return sendErrorResponse(res, ErrorResponses.CONFLICT('Phone number already exists'));
+                }
+            }
+
+            // Check if WhatsApp number is being updated and already exists
+            if (updates.whatsapp_no && updates.whatsapp_no !== user.whatsapp_no) {
+                const existingWhatsapp = await User.findOne({ 
+                    whatsapp_no: updates.whatsapp_no, 
+                    _id: { $ne: user._id } 
+                });
+                if (existingWhatsapp) {
+                    return sendErrorResponse(res, ErrorResponses.CONFLICT('WhatsApp number already exists'));
+                }
+            }
+
+            // If password is being updated, hash it and update show_pass
+            if (updates.password) {
+                updates.show_pass = updates.password; // Store plain password in show_pass
+                updates.password = await hashPassword(updates.password, 10); // Hash the password
             }
 
             // Handle S3 file upload for ID proof
@@ -207,7 +252,8 @@ export class UserController {
                 }
             }
 
-            // Update user
+            // Update user - use { new: true } to return updated document
+            // runValidators is set to true to validate updates
             const updatedUser = await User.findByIdAndUpdate(
                 user._id,
                 { $set: updates },
@@ -218,22 +264,21 @@ export class UserController {
                 return sendErrorResponse(res, ErrorResponses.NOT_FOUND('User not found'));
             }
 
-            return res.json({
-                message: 'Profile updated successfully',
-                user: {
-                    _id: updatedUser._id,
-                    name: updatedUser.name,
-                    email: updatedUser.email,
-                    company_name: updatedUser.company_name,
-                    location: updatedUser.location,
-                    phone_no: updatedUser.phone_no,
-                    whatsapp_no: updatedUser.whatsapp_no,
-                    uid: updatedUser.uid,
-                    kyc: updatedUser.kyc,
-                    vat_number: updatedUser.vat_number,
-                    id_proof: updatedUser.id_proof
-                }
-            });
+            return sendSuccessResponse(res, SuccessResponses.OK('Profile updated successfully', {
+                _id: updatedUser._id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                company_name: updatedUser.company_name,
+                location: updatedUser.location,
+                phone_no: updatedUser.phone_no,
+                whatsapp_no: updatedUser.whatsapp_no,
+                uid: updatedUser.uid,
+                kyc: updatedUser.kyc,
+                vat_number: updatedUser.vat_number,
+                id_proof: updatedUser.id_proof,
+                role: updatedUser.role,
+                approval_status: updatedUser.approval_status
+            }));
 
         } catch (error: any) {
             logError({

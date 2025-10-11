@@ -86,7 +86,7 @@ export async function uploadFiles(req: Request, fileType: string): Promise<{ url
       await s3Client.send(new PutObjectCommand(params));
       const storedUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
       
-      console.log(`Generated file URL: ${fileName}`);
+      console.log(`Generated public file URL: ${storedUrl}`);
       s3ImagesUrl.push(storedUrl);
 
     }catch (error: any) {
