@@ -6,6 +6,7 @@ import userRoutes from './routes/userRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import apiRoutes from './routes/apiRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import excelRoutes from './routes/excelRoutes.js';
 import { errorHandler } from './middleware/validation.js';
 import { logSuccess, logError } from './utils/logger.js';
 import { initializeDatabase } from './utils/seeder.js';
@@ -59,6 +60,7 @@ app.get('/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', apiRoutes);
+app.use('/api', excelRoutes);
 
 // Root route
 app.get('/', (req, res) => {

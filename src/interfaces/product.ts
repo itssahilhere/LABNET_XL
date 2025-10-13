@@ -22,6 +22,7 @@ export interface IProduct extends Document {
     fancy_color: string;
     fancy_color_intensity: string;
     fancy_color_overtone: string;
+    eye_clean?: string;
     seller_name: string;
     seller_company: string;
     seller_location: string;
@@ -37,44 +38,91 @@ export interface IProduct extends Document {
     updatedAt?: Date;
 }
 
-// Allowed values for validation
-export const ALLOWED_SHAPES = [
-    'Round', 'Pear', 'Oval', 'Marquise', 'Heart', 'Radiant', 'Princess', 'Emerald',
-    'Asscher', 'Sq. Emerald', 'Asscher & Sq. Emerald', 'Square Radiant', 'Cushion (All)',
-    'Cushion Brilliant', 'Cushion Modified', 'Baguette', 'European Cut', 'Old Miner',
-    'Briolette', 'Bullets', 'Calf', 'Circular Brilliant', 'Epaulette', 'Flanders',
-    'Half Moon', 'Hexagonal', 'Kite', 'Lozenge', 'Octagonal', 'Pentagonal', 'Rose',
-    'Shield', 'Square', 'Star', 'Tapered Baguette', 'Tapered Bullet', 'Trapezoid',
-    'Triangular', 'Trilliant', 'Other'
-];
+// Product Check (Staging) Interface
+export interface IProductCheck extends Document {
+    pid: string;
+    product_id: string;
+    stock_id: string;
+    shape: string;
+    carat: number;
+    color: string;
+    clarity: string;
+    cut: string;
+    polish: string;
+    symmetry: string;
+    fluorescence: string;
+    laboratory: string;
+    certificate_number: string;
+    depth_percentage: number;
+    table_percentage: number;
+    price_per_carat: number;
+    total_price: number;
+    growth_type: string;
+    fancy_color: string;
+    fancy_color_intensity: string;
+    fancy_color_overtone: string;
+    eye_clean?: string;
+    seller_name: string;
+    seller_company: string;
+    seller_location: string;
+    seller_phone: string;
+    seller_whatsapp: string;
+    seller_email: string;
+    video_url: string;
+    image_url: string;
+    certificate_url: string;
+    measurements: string;
+    seller_id: mongoose.Types.ObjectId;
+    status: 'valid' | 'invalid';
+    remarks: Record<string, string>;
+    createdAt?: Date;
+    updatedAt?: Date;
+}
 
-export const ALLOWED_COLORS = [
-    'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'Other'
-];
+// Excel row interface for parsing
+export interface IExcelRow {
+    Stock_ID?: string;
+    Shape?: string;
+    Carat?: string | number;
+    Color?: string;
+    Clarity?: string;
+    Cut?: string;
+    Polish?: string;
+    Symmetry?: string;
+    Fluorescence?: string;
+    Laboratory?: string;
+    Certificate_Number?: string;
+    Measurements?: string;
+    Depth_Percentage?: string | number;
+    Table_Percentage?: string | number;
+    Price_Per_Carat?: string | number;
+    Total_Price?: string | number;
+    Growth_Type?: string;
+    Fancy_Color?: string;
+    Fancy_Color_Intensity?: string;
+    Fancy_Color_Overtone?: string;
+    Eye_Clean?: string;
+    Seller_Name?: string;
+    Seller_Company?: string;
+    Seller_Location?: string;
+    Seller_Phone?: string;
+    Seller_WhatsApp?: string;
+    Seller_Email?: string;
+    Video_URL?: string;
+    Image_URL?: string;
+    Certificate_URL?: string;
+}
 
-export const ALLOWED_CLARITY = [
-    'FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3'
-];
+// Validation error structure
+export interface IValidationError {
+    row: number;
+    stock_id: string;
+    errors: Record<string, string>;
+}
 
-export const ALLOWED_CUT_POLISH_SYMMETRY = [
-    'Excellent', 'Very Good', 'Good', 'Poor', 'Fair', 'Ideal'
-];
-
-export const ALLOWED_FLUORESCENCE = [
-    'None', 'Faint', 'Medium', 'Strong', 'Very Strong'
-];
-
-export const ALLOWED_LABORATORY = [
-    'GIA', 'GIA DOR', 'HRD', 'IGI', 'AGS', 'CGL', 'DBIOD', 'GCAL', 'GII', 'GHI', 'GSI', 'NGTC', 'PGS', 'RAP', 'RDC', 'SGL', 'NONE'
-];
-
-export const ALLOWED_FANCY_COLORS = [
-    'Black', 'Brown', 'Brownish', 'Champagne', 'Cognac', 'Chameleon', 'Violetish', 'White',
-    'Brown-Greenish', 'Green', 'Greenish', 'Purple', 'Purplish', 'Orange', 'Orangey', 'Violet',
-    'Gray', 'Grayish', 'None', 'Yellow', 'Yellowish', 'Pink', 'Pinkish', 'Blue', 'Bluish',
-    'Red', 'Reddish', 'Gray-Greenish', 'Gray-Yellowish', 'Orange-Brown', 'Other'
-];
-
-export const ALLOWED_FANCY_COLOR_INTENSITY = [
-    'Faint', 'Very Light', 'Fancy Light', 'Light', 'Fancy', 'Dark Fancy', 'Fancy Intense', 'Fancy Deep', 'Other'
-];
+// Upload response structure
+export interface IUploadResponse {
+    status: boolean;
+    inserted: number;
+    errors: IValidationError[];
+}

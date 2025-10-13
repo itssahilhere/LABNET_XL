@@ -1,5 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
-import { IProduct } from '../interfaces/product';
+import { IProductCheck } from '../interfaces/product';
 import {
     ALLOWED_SHAPES,
     ALLOWED_COLORS,
@@ -11,62 +11,59 @@ import {
     ALLOWED_FANCY_COLOR_INTENSITY
 } from '../constants/productValidation';
 
-const productSchema: Schema<IProduct> = new Schema({
+const productCheckSchema: Schema<IProductCheck> = new Schema({
     pid: {
         type: String,
         required: true,
-        unique: true,
         length: 16
     },
     product_id: {
         type: String,
-        required: true,
-        unique: true
+        required: false
     },
     stock_id: {
         type: String,
-        required: true
+        required: false
     },
     shape: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_SHAPES
     },
     carat: {
         type: Number,
-        required: true,
+        required: false,
         min: 0
     },
     color: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_COLORS
     },
     clarity: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_CLARITY
     },
     cut: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_CUT_POLISH_SYMMETRY
     },
     polish: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_CUT_POLISH_SYMMETRY
     },
     symmetry: {
         type: String,
-        required: true,
+        required: false,
         enum: ALLOWED_CUT_POLISH_SYMMETRY
     },
     fluorescence: {
         type: String,
         required: false,
-        enum: ALLOWED_FLUORESCENCE,
-        default: 'None'
+        enum: ALLOWED_FLUORESCENCE
     },
     laboratory: {
         type: String,
@@ -75,53 +72,48 @@ const productSchema: Schema<IProduct> = new Schema({
     },
     certificate_number: {
         type: String,
-        required: false,
-        default: ''
+        required: false
     },
     depth_percentage: {
         type: Number,
-        default: 0,
+        required: false,
         min: 0,
         max: 100
     },
     table_percentage: {
         type: Number,
-        default: 0,
+        required: false,
         min: 0,
         max: 100
     },
     price_per_carat: {
         type: Number,
-        required: true,
+        required: false,
         min: 0
     },
     total_price: {
         type: Number,
-        required: true,
+        required: false,
         min: 0
     },
     growth_type: {
         type: String,
-        required: false,
-        default: 'Natural'
+        required: false
     },
     fancy_color: {
         type: String,
         required: false,
-        enum: ALLOWED_FANCY_COLORS,
-        default: 'None'
+        enum: ALLOWED_FANCY_COLORS
     },
     fancy_color_intensity: {
         type: String,
         required: false,
-        enum: ALLOWED_FANCY_COLOR_INTENSITY,
-        default: 'None'
+        enum: ALLOWED_FANCY_COLOR_INTENSITY
     },
     fancy_color_overtone: {
         type: String,
         required: false,
-        enum: ALLOWED_FANCY_COLORS,
-        default: 'None'
+        enum: ALLOWED_FANCY_COLORS
     },
     eye_clean: {
         type: String,
@@ -131,31 +123,26 @@ const productSchema: Schema<IProduct> = new Schema({
     seller_name: {
         type: String,
         required: false,
-        trim: true,
-        default: ''
+        trim: true
     },
     seller_company: {
         type: String,
         required: false,
-        default: '',
         trim: true
     },
     seller_location: {
         type: String,
         required: false,
-        default: '',
         trim: true
     },
     seller_phone: {
         type: String,
         required: false,
-        default: '',
         trim: true
     },
     seller_whatsapp: {
         type: String,
         required: false,
-        default: '',
         trim: true
     },
     seller_email: {
@@ -163,8 +150,7 @@ const productSchema: Schema<IProduct> = new Schema({
         required: false,
         trim: true,
         lowercase: true,
-        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email'],
-        default: ''
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
     },
     video_url: {
         type: String,
@@ -187,37 +173,39 @@ const productSchema: Schema<IProduct> = new Schema({
     measurements: {
         type: String,
         required: false,
-        match: [/^\d{2}\.\d{2}\*\d{2}\.\d{2}\*\d{2}\.\d{2}$/, 'Measurement must be in the format 99.99*99.99*99.99'],
-        default: '00.00*00.00*00.00'
+        match: [/^\d{2}\.\d{2}\*\d{2}\.\d{2}\*\d{2}\.\d{2}$/, 'Measurement must be in the format 99.99*99.99*99.99']
     },
     seller_id: {
         type: Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    status: {
+        type: String,
+        enum: ['valid', 'invalid'],
+        default: 'valid',
+        required: true
+    },
+    remarks: {
+        type: Schema.Types.Mixed,
+        default: {}
     }
 }, {
     timestamps: true
 });
 
-// Index for better query performance
-productSchema.index({ seller_id: 1, stock_id: 1 }, { unique: true });
-productSchema.index({ shape: 1 });
-productSchema.index({ color: 1 });
-productSchema.index({ clarity: 1 });
-productSchema.index({ carat: 1 });
-productSchema.index({ total_price: 1 });
+// Indexes for better query performance
+// Partial unique index: only enforce uniqueness when stock_id is not null
+productCheckSchema.index(
+    { seller_id: 1, stock_id: 1 }, 
+    { 
+        unique: true,
+        partialFilterExpression: { stock_id: { $type: 'string', $ne: null } }
+    }
+);
+productCheckSchema.index({ status: 1 });
+productCheckSchema.index({ seller_id: 1, status: 1 });
 
-// Generate unique PID
-productSchema.statics.generateUniquePid = async function (): Promise<string> {
-    let pid: string;
-    let product;
-    do {
-        pid = Math.floor(Math.random() * 9000000000000000 + 1000000000000000).toString();
-        product = await this.findOne({ pid });
-    } while (product);
-    return pid;
-};
+const ProductCheck = mongoose.model<IProductCheck>('ProductCheck', productCheckSchema);
 
-const Product = mongoose.model<IProduct>('Product', productSchema);
-
-export default Product;
+export default ProductCheck;

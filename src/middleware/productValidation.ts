@@ -8,7 +8,7 @@ import {
     ALLOWED_LABORATORY,
     ALLOWED_FANCY_COLORS,
     ALLOWED_FANCY_COLOR_INTENSITY
-} from '../interfaces/product';
+} from '../constants/productValidation';
 import { sendErrorResponse, ErrorResponses } from '../utils/responses';
 
 export interface IProductCreateRequest {
@@ -74,57 +74,57 @@ export const validateProductCreation = (req: Request, res: Response, next: NextF
     }
 
     // Validate enum fields
-    if (data.shape && !ALLOWED_SHAPES.includes(data.shape)) {
+    if (data.shape && !(ALLOWED_SHAPES as readonly string[]).includes(data.shape)) {
         if (!errors.shape) errors.shape = [];
         errors.shape.push('The selected shape is invalid');
     }
 
-    if (data.color && !ALLOWED_COLORS.includes(data.color)) {
+    if (data.color && !(ALLOWED_COLORS as readonly string[]).includes(data.color)) {
         if (!errors.color) errors.color = [];
         errors.color.push('The selected color is invalid');
     }
 
-    if (data.clarity && !ALLOWED_CLARITY.includes(data.clarity)) {
+    if (data.clarity && !(ALLOWED_CLARITY as readonly string[]).includes(data.clarity)) {
         if (!errors.clarity) errors.clarity = [];
         errors.clarity.push('The selected clarity is invalid');
     }
 
-    if (data.cut && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.cut)) {
+    if (data.cut && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.cut)) {
         if (!errors.cut) errors.cut = [];
         errors.cut.push('The selected cut is invalid');
     }
 
-    if (data.polish && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.polish)) {
+    if (data.polish && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.polish)) {
         if (!errors.polish) errors.polish = [];
         errors.polish.push('The selected polish is invalid');
     }
 
-    if (data.symmetry && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.symmetry)) {
+    if (data.symmetry && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.symmetry)) {
         if (!errors.symmetry) errors.symmetry = [];
         errors.symmetry.push('The selected symmetry is invalid');
     }
 
-    if (data.fluorescence && !ALLOWED_FLUORESCENCE.includes(data.fluorescence)) {
+    if (data.fluorescence && !(ALLOWED_FLUORESCENCE as readonly string[]).includes(data.fluorescence)) {
         if (!errors.fluorescence) errors.fluorescence = [];
         errors.fluorescence.push('The selected fluorescence is invalid');
     }
 
-    if (data.laboratory && !ALLOWED_LABORATORY.includes(data.laboratory)) {
+    if (data.laboratory && !(ALLOWED_LABORATORY as readonly string[]).includes(data.laboratory)) {
         if (!errors.laboratory) errors.laboratory = [];
         errors.laboratory.push('The selected laboratory is invalid');
     }
 
-    if (data.fancy_color && !ALLOWED_FANCY_COLORS.includes(data.fancy_color)) {
+    if (data.fancy_color && !(ALLOWED_FANCY_COLORS as readonly string[]).includes(data.fancy_color)) {
         if (!errors.fancy_color) errors.fancy_color = [];
         errors.fancy_color.push('The selected fancy color is invalid');
     }
 
-    if (data.fancy_color_intensity && !ALLOWED_FANCY_COLOR_INTENSITY.includes(data.fancy_color_intensity)) {
+    if (data.fancy_color_intensity && !(ALLOWED_FANCY_COLOR_INTENSITY as readonly string[]).includes(data.fancy_color_intensity)) {
         if (!errors.fancy_color_intensity) errors.fancy_color_intensity = [];
         errors.fancy_color_intensity.push('The selected fancy color intensity is invalid');
     }
 
-    if (data.fancy_color_overtone && !ALLOWED_FANCY_COLORS.includes(data.fancy_color_overtone)) {
+    if (data.fancy_color_overtone && !(ALLOWED_FANCY_COLORS as readonly string[]).includes(data.fancy_color_overtone)) {
         if (!errors.fancy_color_overtone) errors.fancy_color_overtone = [];
         errors.fancy_color_overtone.push('The selected fancy color overtone is invalid');
     }
@@ -199,57 +199,57 @@ export const validateProductUpdate = (req: Request, res: Response, next: NextFun
     const data: Partial<IProductCreateRequest> = req.body;
 
     // Validate enum fields if provided
-    if (data.shape && !ALLOWED_SHAPES.includes(data.shape)) {
+    if (data.shape && !(ALLOWED_SHAPES as readonly string[]).includes(data.shape)) {
         if (!errors.shape) errors.shape = [];
         errors.shape.push('The selected shape is invalid');
     }
 
-    if (data.color && !ALLOWED_COLORS.includes(data.color)) {
+    if (data.color && !(ALLOWED_COLORS as readonly string[]).includes(data.color)) {
         if (!errors.color) errors.color = [];
         errors.color.push('The selected color is invalid');
     }
 
-    if (data.clarity && !ALLOWED_CLARITY.includes(data.clarity)) {
+    if (data.clarity && !(ALLOWED_CLARITY as readonly string[]).includes(data.clarity)) {
         if (!errors.clarity) errors.clarity = [];
         errors.clarity.push('The selected clarity is invalid');
     }
 
-    if (data.cut && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.cut)) {
+    if (data.cut && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.cut)) {
         if (!errors.cut) errors.cut = [];
         errors.cut.push('The selected cut is invalid');
     }
 
-    if (data.polish && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.polish)) {
+    if (data.polish && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.polish)) {
         if (!errors.polish) errors.polish = [];
         errors.polish.push('The selected polish is invalid');
     }
 
-    if (data.symmetry && !ALLOWED_CUT_POLISH_SYMMETRY.includes(data.symmetry)) {
+    if (data.symmetry && !(ALLOWED_CUT_POLISH_SYMMETRY as readonly string[]).includes(data.symmetry)) {
         if (!errors.symmetry) errors.symmetry = [];
         errors.symmetry.push('The selected symmetry is invalid');
     }
 
-    if (data.fluorescence && !ALLOWED_FLUORESCENCE.includes(data.fluorescence)) {
+    if (data.fluorescence && !(ALLOWED_FLUORESCENCE as readonly string[]).includes(data.fluorescence)) {
         if (!errors.fluorescence) errors.fluorescence = [];
         errors.fluorescence.push('The selected fluorescence is invalid');
     }
 
-    if (data.laboratory && !ALLOWED_LABORATORY.includes(data.laboratory)) {
+    if (data.laboratory && !(ALLOWED_LABORATORY as readonly string[]).includes(data.laboratory)) {
         if (!errors.laboratory) errors.laboratory = [];
         errors.laboratory.push('The selected laboratory is invalid');
     }
 
-    if (data.fancy_color && !ALLOWED_FANCY_COLORS.includes(data.fancy_color)) {
+    if (data.fancy_color && !(ALLOWED_FANCY_COLORS as readonly string[]).includes(data.fancy_color)) {
         if (!errors.fancy_color) errors.fancy_color = [];
         errors.fancy_color.push('The selected fancy color is invalid');
     }
 
-    if (data.fancy_color_intensity && !ALLOWED_FANCY_COLOR_INTENSITY.includes(data.fancy_color_intensity)) {
+    if (data.fancy_color_intensity && !(ALLOWED_FANCY_COLOR_INTENSITY as readonly string[]).includes(data.fancy_color_intensity)) {
         if (!errors.fancy_color_intensity) errors.fancy_color_intensity = [];
         errors.fancy_color_intensity.push('The selected fancy color intensity is invalid');
     }
 
-    if (data.fancy_color_overtone && !ALLOWED_FANCY_COLORS.includes(data.fancy_color_overtone)) {
+    if (data.fancy_color_overtone && !(ALLOWED_FANCY_COLORS as readonly string[]).includes(data.fancy_color_overtone)) {
         if (!errors.fancy_color_overtone) errors.fancy_color_overtone = [];
         errors.fancy_color_overtone.push('The selected fancy color overtone is invalid');
     }
