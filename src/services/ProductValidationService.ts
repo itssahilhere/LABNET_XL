@@ -9,7 +9,6 @@ import {
     isValidFluorescence,
     isValidCutPolishSymmetry,
     isValidFancyColorIntensity,
-    isValidEyeClean,
     isValidLaboratory,
     isValidGrowthType,
     isValidMeasurement
@@ -95,10 +94,6 @@ export async function validateProductRow(
     
     if (row.Fancy_Color_Overtone && !isValidFancyColor(row.Fancy_Color_Overtone.toString())) {
         errors.fancy_color_overtone = `Invalid: "${row.Fancy_Color_Overtone}"`;
-    }
-    
-    if (row.Eye_Clean && !isValidEyeClean(row.Eye_Clean.toString())) {
-        errors.eye_clean = `Invalid: "${row.Eye_Clean}"`;
     }
     
     if (row.Growth_Type && !isValidGrowthType(row.Growth_Type.toString())) {
@@ -210,7 +205,6 @@ function prepareProductData(row: IExcelRow, sellerId: string, userUid: string) {
         fancy_color: row.Fancy_Color?.toString().trim() || 'None',
         fancy_color_intensity: row.Fancy_Color_Intensity?.toString().trim() || 'None',
         fancy_color_overtone: row.Fancy_Color_Overtone?.toString().trim() || 'None',
-        eye_clean: row.Eye_Clean?.toString().trim() || undefined,
         seller_id: sellerId
     };
 }

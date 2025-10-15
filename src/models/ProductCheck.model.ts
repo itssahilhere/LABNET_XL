@@ -115,11 +115,6 @@ const productCheckSchema: Schema<IProductCheck> = new Schema({
         required: false,
         enum: ALLOWED_FANCY_COLORS
     },
-    eye_clean: {
-        type: String,
-        required: false,
-        trim: true
-    },
     seller_name: {
         type: String,
         required: false,
@@ -194,8 +189,6 @@ const productCheckSchema: Schema<IProductCheck> = new Schema({
     timestamps: true
 });
 
-// Indexes for better query performance
-// Partial unique index: only enforce uniqueness when stock_id is not null
 productCheckSchema.index(
     { seller_id: 1, stock_id: 1 }, 
     { 

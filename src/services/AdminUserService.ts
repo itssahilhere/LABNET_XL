@@ -84,9 +84,9 @@ export class AdminUserService {
             user.rejection_reason = rejectionReason;
         }
 
-        // Enable user if approved
+        // Activate user if approved
         if (status === 'approved') {
-            user.enable = 1;
+            user.is_active = 1;
             user.rejection_reason = undefined;
         }
 

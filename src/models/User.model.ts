@@ -23,7 +23,6 @@ const userSchema: Schema<IUser> = new Schema({
     },
     location: {
         type: String,
-        required: true,
         trim: true,
     },
     phone_no: {
@@ -49,10 +48,6 @@ const userSchema: Schema<IUser> = new Schema({
         required: true,
         unique: true
     },
-    kyc: {
-        type: Number,
-        default: 1
-    },
     vat_number: {
         type: String,
         required: true,
@@ -62,13 +57,21 @@ const userSchema: Schema<IUser> = new Schema({
         type: String,
         trim: true
     },
-    pack_id: {
-        type: Schema.Types.ObjectId,
-        ref: 'Package'
+    package: {
+        id: {
+            type: Schema.Types.ObjectId,
+            ref: 'Package'
+        },
+        start_date: {
+            type: Date
+        },
+        end_date: {
+            type: Date
+        }
     },
-    enable: {
+    is_active: {
         type: Number,
-        default: 0
+        default: 1
     },
     role: {
         type: String,
@@ -90,12 +93,6 @@ const userSchema: Schema<IUser> = new Schema({
     rejection_reason: {
         type: String,
         trim: true
-    },
-    pack_start_date: {
-        type: Date
-    },
-    pack_end_date: {
-        type: Date
     }
 }, {
     timestamps: true
@@ -134,6 +131,11 @@ userSchema.statics.findByCredentials = async function (email: string, password: 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
         throw new Error('Invalid login credentials');
+    }
+
+    // Check if account is active
+    if (user.is_active === 0) {
+        throw new Error('Your account has been deactivated. Please contact admin');
     }
 
     if (user.role !== 'admin' && user.approval_status !== 'approved') {
@@ -176,9 +178,8 @@ userSchema.statics.createDefaultAdmin = async function (): Promise<IUser> {
         uid: adminUid,
         role: 'admin',
         approval_status: 'approved',
-        kyc: 1,
         vat_number: 'ADMIN001',
-        enable: 1
+        is_active: 1
     });
 
     await adminUser.save();

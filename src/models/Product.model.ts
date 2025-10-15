@@ -123,11 +123,6 @@ const productSchema: Schema<IProduct> = new Schema({
         enum: ALLOWED_FANCY_COLORS,
         default: 'None'
     },
-    eye_clean: {
-        type: String,
-        required: false,
-        trim: true
-    },
     seller_name: {
         type: String,
         required: false,

@@ -8,10 +8,8 @@ import { logError, logSuccess } from '../utils/logger';
 import { StripeService, StripeCheckoutSessionData } from '../utils/stripe';
 
 export class ApiController {
-    // Store/Create new product
     public async store(req: Request, res: Response): Promise<Response> {
         try {
-            // Check if user is authenticated
             if (!req.user) {
                 return res.status(401).json({
                     status: false,
@@ -22,17 +20,15 @@ export class ApiController {
             const user = req.user;
             const productData: IProductCreateRequest = req.body;
 
-            // Check if user has an active package
-            if (!user.pack_end_date) {
+            if (!user.package?.end_date) {
                 return res.status(403).json({
                     status: false,
                     message: 'You can add products only after buying a package.'
                 });
             }
 
-            // Check if package hasn't expired
             const today = new Date();
-            const packEndDate = new Date(user.pack_end_date);
+            const packEndDate = new Date(user.package?.end_date);
             if (packEndDate < today) {
                 return res.status(403).json({
                     status: false,
@@ -53,7 +49,6 @@ export class ApiController {
                 });
             }
 
-            // Generate unique PID (16-digit random number)
             const pid = await (Product as any).generateUniquePid();
 
             // Generate unique product_id as {user_uid}_{stock_id}
@@ -231,7 +226,6 @@ export class ApiController {
 
             const { id } = req.params;
             
-            // Try to find by MongoDB ObjectId first, then by PID
             let product = await Product.findOne({
                 $and: [
                     { seller_id: req.user._id },
@@ -437,9 +431,9 @@ export class ApiController {
 
             // Check if user already has an active package
             const user = req.user;
-            if (user.pack_end_date) {
+            if (user.package?.end_date) {
                 const today = new Date();
-                const packEndDate = new Date(user.pack_end_date);
+                const packEndDate = new Date(user.package?.end_date);
                 if (packEndDate > today) {
                     return res.status(400).json({
                         status: false,
@@ -519,7 +513,6 @@ export class ApiController {
     // Get user's package history
     public async package_history(req: Request, res: Response): Promise<Response> {
         try {
-            // Check if user is authenticated
             if (!req.user) {
                 return res.status(401).json({
                     status: false,
@@ -541,12 +534,12 @@ export class ApiController {
 
             // Get current active package info
             let currentPackage = null;
-            if (user.pack_end_date) {
+            if (user.package?.end_date) {
                 const today = new Date();
-                const packEndDate = new Date(user.pack_end_date);
+                const packEndDate = new Date(user.package?.end_date);
                 if (packEndDate > today) {
                     currentPackage = {
-                        end_date: user.pack_end_date,
+                        end_date: user.package?.end_date,
                         days_remaining: Math.ceil((packEndDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
                     };
                 }

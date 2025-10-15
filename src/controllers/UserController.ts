@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import User from '../models/User.model';
 import { IRegisterRequest, IRegisterResponse } from '../interfaces/user';
 import { S3UploadRequest } from '../interfaces/fileUpload';
@@ -7,8 +6,15 @@ import { logError } from '../utils/logger';
 import { uploadFiles } from '../utils/fileUpload';
 import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
 import { hashPassword } from '../utils/password';
+import { SellerDashboardService } from '../services/SellerDashboardService';
 
 export class UserController {
+    private dashboardService: SellerDashboardService;
+
+    constructor() {
+        this.dashboardService = new SellerDashboardService();
+    }
+
     // Register new user
     public async register(req: Request, res: Response): Promise<Response> {
         try {
@@ -19,7 +25,6 @@ export class UserController {
 
             if (!data.name) errors.push('Name is required');
             if (!data.company_name) errors.push('Company name is required');
-            if (!data.location) errors.push('Location is required');
             if (!data.email) errors.push('Email is required');
             if (!data.password) errors.push('Password is required');
             if (!data.phone_number) errors.push('Phone number is required');
@@ -71,7 +76,6 @@ export class UserController {
                 password: data.password,
                 show_pass: data.password,
                 uid: uid,
-                kyc: 1,
                 vat_number: data.vat_number,
                 id_proof: idProofPath
             });
@@ -91,7 +95,6 @@ export class UserController {
                     phone_no: user.phone_no,
                     whatsapp_no: user.whatsapp_no,
                     uid: user.uid,
-                    kyc: user.kyc,
                     vat_number: user.vat_number,
                     id_proof: user.id_proof,
                     approval_status: user.approval_status
@@ -160,14 +163,12 @@ export class UserController {
                 phone_no: user.phone_no,
                 whatsapp_no: user.whatsapp_no,
                 uid: user.uid,
-                kyc: user.kyc,
                 vat_number: user.vat_number,
                 id_proof: user.id_proof,
-                enable: user.enable,
+                is_active: user.is_active,
                 role: user.role,
                 approval_status: user.approval_status,
-                pack_start_date: user.pack_start_date,
-                pack_end_date: user.pack_end_date
+                package: user.package
             }));
 
         } catch (error: any) {
@@ -192,7 +193,6 @@ export class UserController {
             const allowedUpdates = ['name', 'company_name', 'location', 'email', 'phone_no', 'whatsapp_no', 'vat_number', 'password'];
             const updateKeys = Object.keys(updates).filter(key => key !== 'fileDetails' && key !== 'id_proof');
 
-            // Check if all update keys are allowed
             const isValidOperation = updateKeys.every(update => allowedUpdates.includes(update));
             if (!isValidOperation) {
                 return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Invalid updates'));
@@ -236,9 +236,8 @@ export class UserController {
                 }
             }
 
-            // If password is being updated, hash it and update show_pass
             if (updates.password) {
-                updates.show_pass = updates.password; // Store plain password in show_pass
+                updates.show_pass = updates.password; 
                 updates.password = await hashPassword(updates.password, 10); // Hash the password
             }
 
@@ -252,8 +251,6 @@ export class UserController {
                 }
             }
 
-            // Update user - use { new: true } to return updated document
-            // runValidators is set to true to validate updates
             const updatedUser = await User.findByIdAndUpdate(
                 user._id,
                 { $set: updates },
@@ -273,7 +270,6 @@ export class UserController {
                 phone_no: updatedUser.phone_no,
                 whatsapp_no: updatedUser.whatsapp_no,
                 uid: updatedUser.uid,
-                kyc: updatedUser.kyc,
                 vat_number: updatedUser.vat_number,
                 id_proof: updatedUser.id_proof,
                 role: updatedUser.role,
@@ -285,6 +281,52 @@ export class UserController {
                 userId: req.user?._id || 'unknown',
                 functionName: 'updateProfile',
                 errorMsg: `Profile update failed: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    // Get seller dashboard statistics
+    public async getDashboard(req: Request, res: Response): Promise<Response> {
+        try {
+            const user = req.user;
+            if (!user) {
+                return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
+            }
+
+            // Get dashboard stats
+            const dashboardStats = await this.dashboardService.getDashboardStats(user._id);
+
+            return sendSuccessResponse(res, SuccessResponses.OK('Dashboard statistics retrieved successfully', dashboardStats));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'getDashboard',
+                errorMsg: `Dashboard retrieval failed: ${error.message}`
+            });
+            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+        }
+    }
+
+    // Get detailed product statistics
+    public async getProductStats(req: Request, res: Response): Promise<Response> {
+        try {
+            const user = req.user;
+            if (!user) {
+                return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
+            }
+
+            // Get product stats
+            const productStats = await this.dashboardService.getProductStats(user._id);
+
+            return sendSuccessResponse(res, SuccessResponses.OK('Product statistics retrieved successfully', productStats));
+
+        } catch (error: any) {
+            logError({
+                userId: req.user?._id || 'unknown',
+                functionName: 'getProductStats',
+                errorMsg: `Product stats retrieval failed: ${error.message}`
             });
             return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
         }

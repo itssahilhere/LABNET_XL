@@ -39,10 +39,6 @@ export const ALLOWED_FANCY_COLOR_INTENSITY = [
     'Fancy Intense', 'Fancy Deep', 'Other'
 ] as const;
 
-export const ALLOWED_EYE_CLEAN = [
-    'Yes', 'Border Line', 'E1', 'E2(No)'
-] as const;
-
 export const ALLOWED_LABORATORY = [
     'GIA', 'GIA DOR', 'HRD', 'IGI', 'AGS', 'CGL', 'DBIOD', 'GCAL', 'GII', 
     'GHI', 'GSI', 'NGTC', 'PGS', 'RAP', 'RDC', 'SGL', 'NONE'
@@ -60,7 +56,6 @@ export type FancyColor = typeof ALLOWED_FANCY_COLORS[number];
 export type Fluorescence = typeof ALLOWED_FLUORESCENCE[number];
 export type CutPolishSymmetry = typeof ALLOWED_CUT_POLISH_SYMMETRY[number];
 export type FancyColorIntensity = typeof ALLOWED_FANCY_COLOR_INTENSITY[number];
-export type EyeClean = typeof ALLOWED_EYE_CLEAN[number];
 export type Laboratory = typeof ALLOWED_LABORATORY[number];
 export type GrowthType = typeof ALLOWED_GROWTH_TYPES[number];
 
@@ -91,10 +86,6 @@ export function isValidCutPolishSymmetry(value: string): value is CutPolishSymme
 
 export function isValidFancyColorIntensity(value: string): value is FancyColorIntensity {
     return ALLOWED_FANCY_COLOR_INTENSITY.includes(value as FancyColorIntensity);
-}
-
-export function isValidEyeClean(value: string): value is EyeClean {
-    return ALLOWED_EYE_CLEAN.includes(value as EyeClean);
 }
 
 export function isValidLaboratory(value: string): value is Laboratory {
@@ -134,7 +125,6 @@ export const EXCEL_HEADERS = [
     'Fancy_Color',
     'Fancy_Color_Intensity',
     'Fancy_Color_Overtone',
-    'Eye_Clean',
     'Seller_Name',
     'Seller_Company',
     'Seller_Location',

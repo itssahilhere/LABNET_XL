@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Stripe from 'stripe';
+import mongoose from 'mongoose';
 import User from '../models/User.model';
 import Package from '../models/Package.model';
 import PackActive from '../models/PackActive.model';
@@ -75,9 +76,12 @@ export class WebhookController {
             endDate.setDate(startDate.getDate() + packageData.duration_days);
 
             // Update user's package information
-            user.pack_id = packageData._id as any;
-            user.pack_start_date = startDate;
-            user.pack_end_date = endDate;
+            if (!user.package) {
+                user.package = {};
+            }
+            user.package.id = packageData._id as mongoose.Types.ObjectId;
+            user.package.start_date = startDate;
+            user.package.end_date = endDate;
             await user.save();
 
             // Find the payment log to get payment_id

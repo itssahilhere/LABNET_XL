@@ -22,7 +22,6 @@ export interface IProduct extends Document {
     fancy_color: string;
     fancy_color_intensity: string;
     fancy_color_overtone: string;
-    eye_clean?: string;
     seller_name: string;
     seller_company: string;
     seller_location: string;
@@ -61,7 +60,6 @@ export interface IProductCheck extends Document {
     fancy_color: string;
     fancy_color_intensity: string;
     fancy_color_overtone: string;
-    eye_clean?: string;
     seller_name: string;
     seller_company: string;
     seller_location: string;
@@ -101,7 +99,6 @@ export interface IExcelRow {
     Fancy_Color?: string;
     Fancy_Color_Intensity?: string;
     Fancy_Color_Overtone?: string;
-    Eye_Clean?: string;
     Seller_Name?: string;
     Seller_Company?: string;
     Seller_Location?: string;

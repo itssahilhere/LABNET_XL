@@ -47,10 +47,6 @@ export class ExcelController {
         }
     }
 
-    /**
-     * Upload Excel file to staging
-     * POST /api/product-check/upload
-     */
     public uploadExcel = (req: Request, res: Response): void => {
         upload(req, res, async (err) => {
             if (err) {
@@ -64,7 +60,7 @@ export class ExcelController {
                 }
 
                 // Check if user has active package
-                if (!user.pack_end_date || new Date(user.pack_end_date) < new Date()) {
+                if (!user.package?.end_date || new Date(user.package.end_date) < new Date()) {
                     return sendErrorResponse(res, ErrorResponses.FORBIDDEN('Your package has expired. Please buy a package first.'));
                 }
 
@@ -116,12 +112,10 @@ export class ExcelController {
                     await productCheck.save();
                     inserted++;
                     
-                    // Track this stock_id to prevent duplicates within the same upload
                     if (row.Stock_ID) {
                         processedStockIds.push(row.Stock_ID.toString().trim());
                     }
 
-                    // Add to errors array if invalid
                     if (!validation.isValid) {
                         errors.push({
                             row: rowNumber,
@@ -148,10 +142,6 @@ export class ExcelController {
         });
     };
 
-    /**
-     * List all staging products for authenticated user
-     * GET /api/product-check
-     */
     public async listStagingProducts(req: Request, res: Response): Promise<Response> {
         try {
             const user = req.user;
@@ -178,10 +168,6 @@ export class ExcelController {
         }
     }
 
-    /**
-     * Update staging product and move to products if valid
-     * POST /api/product-check/:id
-     */
     public async updateStagingProduct(req: Request, res: Response): Promise<Response> {
         try {
             const user = req.user;
@@ -190,7 +176,7 @@ export class ExcelController {
             }
 
             // Check package
-            if (!user.pack_end_date || new Date(user.pack_end_date) < new Date()) {
+            if (!user.package?.end_date || new Date(user.package?.end_date) < new Date()) {
                 return sendErrorResponse(res, ErrorResponses.FORBIDDEN('Your package has expired. Please buy a package first.'));
             }
 
@@ -210,26 +196,21 @@ export class ExcelController {
             // Update fields
             Object.assign(productCheck, updates);
 
-            // Re-validate
             const validation = await validateProductData(productCheck.toObject(), user._id.toString(), id);
 
             if (validation.isValid) {
-                // Prepare product data
                 const productData = productCheck.toObject();
                 
-                // Generate product_id if not present (format: {userUid}_{stock_id})
                 if (!productData.product_id && productData.stock_id) {
                     productData.product_id = `${user.uid}_${productData.stock_id}`;
                 }
                 
-                // Move to products table
                 const product = new Product({
                     ...productData,
                     _id: undefined
                 });
                 await product.save();
 
-                // Delete from staging
                 await ProductCheck.findByIdAndDelete(id);
 
                 return res.json({
@@ -237,7 +218,6 @@ export class ExcelController {
                     message: 'Row moved to products successfully'
                 });
             } else {
-                // Update staging with errors
                 productCheck.status = 'invalid';
                 productCheck.remarks = validation.errors;
                 await productCheck.save();
@@ -258,10 +238,7 @@ export class ExcelController {
         }
     }
 
-    /**
-     * Bulk save valid products from staging to products table
-     * POST /api/save-all
-     */
+    
     public async bulkSaveProducts(req: Request, res: Response): Promise<Response> {
         try {
             const user = req.user;
@@ -269,8 +246,7 @@ export class ExcelController {
                 return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
             }
 
-            // Check package
-            if (!user.pack_end_date || new Date(user.pack_end_date) < new Date()) {
+            if (!user.package?.end_date || new Date(user.package?.end_date) < new Date()) {
                 return sendErrorResponse(res, ErrorResponses.FORBIDDEN('Your package has expired. Please buy a package first.'));
             }
 
@@ -293,7 +269,6 @@ export class ExcelController {
                         rowData.pid = await (Product as any).generateUniquePid();
                     }
                     
-                    // Generate product_id if not present (format: {userUid}_{stock_id})
                     if (!rowData.product_id && rowData.stock_id) {
                         rowData.product_id = `${user.uid}_${rowData.stock_id}`;
                     }
@@ -358,7 +333,7 @@ export class ExcelController {
             }
 
             // Check package
-            if (!user.pack_end_date || new Date(user.pack_end_date) < new Date()) {
+            if (!user.package?.end_date || new Date(user.package?.end_date) < new Date()) {
                 return sendErrorResponse(res, ErrorResponses.FORBIDDEN('Your package has expired. Please buy a package first.'));
             }
 
@@ -437,7 +412,7 @@ export class ExcelController {
             }
 
             // Check package
-            if (!user.pack_end_date || new Date(user.pack_end_date) < new Date()) {
+            if (!user.package?.end_date || new Date(user.package?.end_date) < new Date()) {
                 return sendErrorResponse(res, ErrorResponses.FORBIDDEN('Your package has expired. Please buy a package first.'));
             }
 

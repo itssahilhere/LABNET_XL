@@ -31,7 +31,7 @@ router.put('/products/:id',
 );
 
 // DELETE /api/products/:id - Delete product
-router.delete('/products/:id', 
+router.delete('/delete_product/:id', 
   (req: Request, res: Response) => apiController.destroy(req, res)
 );
 

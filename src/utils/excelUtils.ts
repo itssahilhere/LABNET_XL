@@ -99,7 +99,6 @@ export async function exportProductsToExcel(sellerId: string): Promise<Buffer> {
         'Fancy Color': product.fancy_color,
         'Color Intensity': product.fancy_color_intensity,
         'Overtone': product.fancy_color_overtone,
-        'Eye Clean': product.eye_clean || '',
         'Seller Name': product.seller_name,
         'Company': product.seller_company,
         'Location': product.seller_location,
@@ -162,7 +161,6 @@ export async function exportStagingProductsToExcel(sellerId: string): Promise<Bu
         'Fancy Color': product.fancy_color,
         'Color Intensity': product.fancy_color_intensity,
         'Overtone': product.fancy_color_overtone,
-        'Eye Clean': product.eye_clean || '',
         'Errors': product.status === 'invalid' 
             ? JSON.stringify(product.remarks) 
             : '',

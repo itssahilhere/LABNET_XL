@@ -4,24 +4,25 @@ export interface IUser extends Document {
   name: string;
   email: string;
   company_name: string;
-  location: string;
+  location?: string;
   phone_no: string;
   whatsapp_no?: string;
   password: string;
   show_pass: string;
   uid: string;
-  kyc: number;
   vat_number: string;
   id_proof?: string;
-  pack_id?: mongoose.Types.ObjectId;
-  enable?: number;
+  package?: {
+    id?: mongoose.Types.ObjectId;
+    start_date?: Date;
+    end_date?: Date;
+  };
+  is_active?: number;
   role: 'user' | 'admin';
   approval_status: 'pending' | 'approved' | 'rejected';
   approved_by?: mongoose.Types.ObjectId;
   approved_at?: Date;
   rejection_reason?: string;
-  pack_start_date?: Date;
-  pack_end_date?: Date;
   createdAt?: Date;
   updatedAt?: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -37,13 +38,13 @@ export interface IUserModel extends Model<IUser> {
 export interface IRegisterRequest {
   name: string;
   company_name: string;
-  location: string;
+  location?: string;
   email: string;
   password: string;
   phone_number: string;
   whatsapp_number?: string;
   vat_number: string;
-  id_proof?: any; 
+  id_proof: any; 
 }
 
 export interface IRegisterResponse {
