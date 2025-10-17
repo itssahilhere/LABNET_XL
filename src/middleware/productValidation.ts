@@ -129,32 +129,6 @@ export const validateProductCreation = (req: Request, res: Response, next: NextF
         errors.fancy_color_overtone.push('The selected fancy color overtone is invalid');
     }
 
-    // Validate numeric fields
-    // if (data.carat && (typeof data.carat !== 'number' || data.carat < 0)) {
-    //     if (!errors.carat) errors.carat = [];
-    //     errors.carat.push('Carat must be a positive number');
-    // }
-
-    // if (data.depth_percentage && (typeof data.depth_percentage !== 'number' || data.depth_percentage < 0 || data.depth_percentage > 100)) {
-    //     if (!errors.depth_percentage) errors.depth_percentage = [];
-    //     errors.depth_percentage.push('Depth percentage must be between 0 and 100');
-    // }
-
-    // if (data.table_percentage && (typeof data.table_percentage !== 'number' || data.table_percentage < 0 || data.table_percentage > 100)) {
-    //     if (!errors.table_percentage) errors.table_percentage = [];
-    //     errors.table_percentage.push('Table percentage must be between 0 and 100');
-    // }
-
-    // if (data.price_per_carat && (typeof data.price_per_carat !== 'number' || data.price_per_carat < 0)) {
-    //     if (!errors.price_per_carat) errors.price_per_carat = [];
-    //     errors.price_per_carat.push('Price per carat must be a positive number');
-    // }
-
-    // if (data.total_price && (typeof data.total_price !== 'number' || data.total_price < 0)) {
-    //     if (!errors.total_price) errors.total_price = [];
-    //     errors.total_price.push('Total price must be a positive number');
-    // }
-
     // Validate email format
     if (data.seller_email && !emailRegex.test(data.seller_email)) {
         if (!errors.seller_email) errors.seller_email = [];
