@@ -309,26 +309,4 @@ export class UserController {
         }
     }
 
-    // Get detailed product statistics
-    public async getProductStats(req: Request, res: Response): Promise<Response> {
-        try {
-            const user = req.user;
-            if (!user) {
-                return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
-            }
-
-            // Get product stats
-            const productStats = await this.dashboardService.getProductStats(user._id);
-
-            return sendSuccessResponse(res, SuccessResponses.OK('Product statistics retrieved successfully', productStats));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getProductStats',
-                errorMsg: `Product stats retrieval failed: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
 }

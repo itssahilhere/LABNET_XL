@@ -33,10 +33,5 @@ router.get('/dashboard',
   (req: Request, res: Response) => userController.getDashboard(req, res)
 );
 
-router.get('/dashboard/products/stats', 
-  authenticateToken, 
-  (req: Request, res: Response) => userController.getProductStats(req, res)
-);
-
 
 export default router;
