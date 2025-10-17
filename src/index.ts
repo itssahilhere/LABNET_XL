@@ -8,7 +8,7 @@ import apiRoutes from './routes/apiRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import excelRoutes from './routes/excelRoutes.js';
 import { errorHandler } from './middleware/validation.js';
-import { logSuccess, logError } from './utils/logger.js';
+import { logSuccess } from './utils/logger.js';
 import { initializeDatabase } from './utils/seeder.js';
 
 dotenv.config();
@@ -18,10 +18,13 @@ const port = process.env.PORT || 3000;
 
 // CORS configuration
 const corsOptions = {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 };
 
 // Middleware
@@ -35,25 +38,25 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use((req, res, next) => {
-    logSuccess({
-        userId: 'system',
-        functionName: 'requestLogger',
-        successMsg: `${req.method} ${req.path} - ${req.ip}`
-    });
-    next();
+  logSuccess({
+    userId: 'system',
+    functionName: 'requestLogger',
+    successMsg: `${req.method} ${req.path} - ${req.ip}`,
+  });
+  next();
 });
 
 connectDB().then(() => {
-    initializeDatabase();
+  initializeDatabase();
 });
 
 app.get('/health', (req, res) => {
-    res.status(200).json({
-        status: 'OK',
-        message: 'LabnetXL Backend API is running',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-    });
+  res.status(200).json({
+    status: 'OK',
+    message: 'LabnetXL Backend API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+  });
 });
 
 // API Routes
@@ -64,52 +67,52 @@ app.use('/api', excelRoutes);
 
 // Root route
 app.get('/', (req, res) => {
-    res.json({
-        message: 'Welcome to LabnetXL Backend API',
-        version: '1.0.0',
-        documentation: '/api/docs'
-    });
+  res.json({
+    message: 'Welcome to LabnetXL Backend API',
+    version: '1.0.0',
+    documentation: '/api/docs',
+  });
 });
 
 // Handle 404 routes
 app.use('*', (req, res) => {
-    res.status(404).json({
-        message: 'Route not found',
-        path: req.originalUrl
-    });
+  res.status(404).json({
+    message: 'Route not found',
+    path: req.originalUrl,
+  });
 });
 
 app.use(errorHandler);
 
 const server = app.listen(port, () => {
-    logSuccess({
-        userId: 'system',
-        functionName: 'server',
-        successMsg: `Server is running on port ${port}`
-    });
+  logSuccess({
+    userId: 'system',
+    functionName: 'server',
+    successMsg: `Server is running on port ${port}`,
+  });
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
-    logSuccess({
-        userId: 'system',
-        functionName: 'shutdown',
-        successMsg: 'SIGTERM received, shutting down gracefully'
-    });
-    server.close(() => {
-        process.exit(0);
-    });
+  logSuccess({
+    userId: 'system',
+    functionName: 'shutdown',
+    successMsg: 'SIGTERM received, shutting down gracefully',
+  });
+  server.close(() => {
+    process.exit(0);
+  });
 });
 
 process.on('SIGINT', () => {
-    logSuccess({
-        userId: 'system',
-        functionName: 'shutdown',
-        successMsg: 'SIGINT received, shutting down gracefully'
-    });
-    server.close(() => {
-        process.exit(0);
-    });
+  logSuccess({
+    userId: 'system',
+    functionName: 'shutdown',
+    successMsg: 'SIGINT received, shutting down gracefully',
+  });
+  server.close(() => {
+    process.exit(0);
+  });
 });
 
 export default app;

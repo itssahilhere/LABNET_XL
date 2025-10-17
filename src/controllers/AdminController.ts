@@ -1,361 +1,406 @@
 import { Request, Response } from 'express';
 import { IApprovalRequest, IRoleUpdateRequest } from '../interfaces/user';
 import { logError, logSuccess } from '../utils/logger';
-import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
+import {
+  sendErrorResponse,
+  sendSuccessResponse,
+  ErrorResponses,
+  SuccessResponses,
+} from '../utils/responses';
 import { AdminUserService } from '../services/AdminUserService';
 import { AdminDashboardService } from '../services/AdminDashboardService';
 import Package from '../models/Package.model';
 
 export class AdminController {
-    private adminUserService: AdminUserService;
-    private adminDashboardService: AdminDashboardService;
+  private adminUserService: AdminUserService;
+  private adminDashboardService: AdminDashboardService;
 
-    constructor() {
-        this.adminUserService = new AdminUserService();
-        this.adminDashboardService = new AdminDashboardService();
+  constructor() {
+    this.adminUserService = new AdminUserService();
+    this.adminDashboardService = new AdminDashboardService();
+  }
+
+  // Middleware check for admin access
+  private checkAdminAccess(req: Request, res: Response): boolean {
+    if (req.user?.role !== 'admin') {
+      sendErrorResponse(res, ErrorResponses.FORBIDDEN('Admin access required'));
+      return false;
     }
+    return true;
+  }
 
-    // Middleware check for admin access
-    private checkAdminAccess(req: Request, res: Response): boolean {
-        if (req.user?.role !== 'admin') {
-            sendErrorResponse(res, ErrorResponses.FORBIDDEN('Admin access required'));
-            return false;
+  // Get dashboard statistics
+  public async getDashboardStats(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const stats = await this.adminDashboardService.getDashboardStats();
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('Dashboard statistics retrieved successfully', stats)
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'getDashboardStats',
+        errorMsg: `Dashboard stats retrieval failed: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+    }
+  }
+
+  // Get all pending users for approval
+  public async getPendingUsers(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await this.adminUserService.getPendingUsers(page, limit);
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('Pending users retrieved successfully', result)
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'getPendingUsers',
+        errorMsg: `Failed to get pending users: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+    }
+  }
+
+  // Get all users
+  public async getAllUsers(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const page = parseInt(req.query.page as string) || parseInt(req.body?.page) || 1;
+      const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
+
+      // Legacy query params (for backward compatibility)
+      const status = req.query.status as string | undefined;
+      const role = req.query.role as string | undefined;
+
+      // Advanced filters from body
+      const filters = req.body?.filters || [];
+      const search = req.body?.search || '';
+      const sortBy = req.body?.sortBy || 'createdAt';
+      const sortOrder = req.body?.sortOrder || 'desc';
+
+      const result = await this.adminUserService.getAllUsers(
+        page,
+        limit,
+        status,
+        role,
+        filters,
+        search,
+        sortBy,
+        sortOrder
+      );
+
+      return sendSuccessResponse(res, SuccessResponses.OK('Users retrieved successfully', result));
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'getAllUsers',
+        errorMsg: `Failed to get users: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+    }
+  }
+
+  // Approve or reject user
+  public async approveUser(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const approvalData: IApprovalRequest = req.body;
+      const adminId = req.user._id;
+
+      const result = await this.adminUserService.approveUser(approvalData, adminId);
+
+      const message =
+        result.status === 'approved' ? 'User approved successfully' : 'User rejected successfully';
+
+      return sendSuccessResponse(res, SuccessResponses.OK(message, result));
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'approveUser',
+        errorMsg: `User approval failed: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
+    }
+  }
+
+  // Update user role
+  public async updateUserRole(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const { userId } = req.params;
+      const { role, reason }: IRoleUpdateRequest = req.body;
+      const adminId = req.user._id;
+
+      const result = await this.adminUserService.updateUserRole(userId, role, adminId, reason);
+
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('User role updated successfully', {
+          userId: result.user._id,
+          email: result.user.email,
+          name: result.user.name,
+          oldRole: result.oldRole,
+          newRole: result.newRole,
+          updatedBy: req.user.name,
+          updatedAt: new Date(),
+          reason: result.reason || null,
+        })
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'updateUserRole',
+        errorMsg: `Failed to update user role: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
+    }
+  }
+
+  // Get users with file filter options
+  public async getUsersWithFiles(req: Request, res: Response): Promise<Response> {
+    try {
+      if (!this.checkAdminAccess(req, res)) return res;
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const hasFiles =
+        req.query.hasFiles === 'true' ? true : req.query.hasFiles === 'false' ? false : undefined;
+      const approvalStatus = req.query.approvalStatus as string;
+
+      const result = await this.adminUserService.getUsersWithFiles(
+        page,
+        limit,
+        hasFiles,
+        approvalStatus
+      );
+      return sendSuccessResponse(res, SuccessResponses.OK('Users retrieved successfully', result));
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'getUsersWithFiles',
+        errorMsg: `Failed to get users with files: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+    }
+  }
+
+  async createPackage(req: Request, res: Response) {
+    try {
+      const { name, amount, pack_type, duration_days, max_products, features } = req.body;
+
+      // Validation
+      if (!name || !amount || !pack_type || !duration_days) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Name, amount, pack_type, and duration_days are required')
+        );
+      }
+
+      if (amount < 0) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Amount must be a positive number')
+        );
+      }
+
+      if (duration_days < 1) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Duration days must be at least 1')
+        );
+      }
+
+      const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+      if (!validPackTypes.includes(pack_type.toLowerCase())) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`)
+        );
+      }
+
+      // Check if package with same name already exists
+      const existingPackage = await Package.findOne({ name: name.trim() });
+      if (existingPackage) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Package with this name already exists')
+        );
+      }
+
+      // Create new package
+      const newPackage = await Package.create({
+        name: name.trim(),
+        amount: Number(amount),
+        pack_type: pack_type.toLowerCase(),
+        duration_days: Number(duration_days),
+        max_products: max_products ? Number(max_products) : undefined,
+        features: features || [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      logSuccess({
+        userId: req.user?._id || 'admin',
+        functionName: 'createPackage',
+        successMsg: `Package created: ${newPackage._id}`,
+      });
+
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.CREATED('Package created successfully', newPackage)
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'createPackage',
+        errorMsg: `Failed to create package: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
+    }
+  }
+
+  async updatePackage(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { name, amount, pack_type, duration_days, max_products, features } = req.body;
+
+      // Find package
+      const packageToUpdate = await Package.findById(id);
+      if (!packageToUpdate) {
+        return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
+      }
+
+      // Validation
+      if (amount !== undefined && amount < 0) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Amount must be a positive number')
+        );
+      }
+
+      if (duration_days !== undefined && duration_days < 1) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST('Duration days must be at least 1')
+        );
+      }
+
+      const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+      if (pack_type !== undefined && !validPackTypes.includes(pack_type.toLowerCase())) {
+        return sendErrorResponse(
+          res,
+          ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`)
+        );
+      }
+
+      // Check if new name conflicts with existing package
+      if (name && name.trim() !== packageToUpdate.name) {
+        const existingPackage = await Package.findOne({ name: name.trim(), _id: { $ne: id } });
+        if (existingPackage) {
+          return sendErrorResponse(
+            res,
+            ErrorResponses.BAD_REQUEST('Package with this name already exists')
+          );
         }
-        return true;
+      }
+
+      // Update fields
+      if (name !== undefined) packageToUpdate.name = name.trim();
+      if (amount !== undefined) packageToUpdate.amount = Number(amount);
+      if (pack_type !== undefined) packageToUpdate.pack_type = pack_type.toLowerCase();
+      if (duration_days !== undefined) packageToUpdate.duration_days = Number(duration_days);
+      if (max_products !== undefined)
+        packageToUpdate.max_products = max_products ? Number(max_products) : null;
+      if (features !== undefined) packageToUpdate.features = features;
+      packageToUpdate.updatedAt = new Date();
+
+      await packageToUpdate.save();
+
+      logError({
+        userId: req.user?._id || 'admin',
+        functionName: 'updatePackage',
+        errorMsg: `Package updated: ${packageToUpdate._id}`,
+      });
+
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('Package updated successfully', packageToUpdate)
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'updatePackage',
+        errorMsg: `Failed to update package: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
     }
+  }
 
-    // Get dashboard statistics
-    public async getDashboardStats(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
+  async deletePackage(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
 
-            const stats = await this.adminDashboardService.getDashboardStats();
-            return sendSuccessResponse(res, SuccessResponses.OK('Dashboard statistics retrieved successfully', stats));
+      // Find and delete package
+      const deletedPackage = await Package.findByIdAndDelete(id);
+      if (!deletedPackage) {
+        return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
+      }
 
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getDashboardStats',
-                errorMsg: `Dashboard stats retrieval failed: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
+      logSuccess({
+        userId: req.user?._id || 'admin',
+        functionName: 'deletePackage',
+        successMsg: `Package deleted: ${deletedPackage._id}`,
+      });
+
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('Package deleted successfully', {
+          id: deletedPackage._id,
+          name: deletedPackage.name,
+        })
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'deletePackage',
+        errorMsg: `Failed to delete package: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
     }
+  }
 
-    // Get all pending users for approval
-    public async getPendingUsers(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
+  async getAllPackages(req: Request, res: Response) {
+    try {
+      const packages = await Package.find().sort({ createdAt: -1 });
 
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
-
-            const result = await this.adminUserService.getPendingUsers(page, limit);
-            return sendSuccessResponse(res, SuccessResponses.OK('Pending users retrieved successfully', result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getPendingUsers',
-                errorMsg: `Failed to get pending users: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
+      return sendSuccessResponse(
+        res,
+        SuccessResponses.OK('Packages retrieved successfully', {
+          total: packages.length,
+          packages,
+        })
+      );
+    } catch (error: any) {
+      logError({
+        userId: req.user?._id || 'unknown',
+        functionName: 'getAllPackages',
+        errorMsg: `Failed to get packages: ${error.message}`,
+      });
+      return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
     }
-
-    // Get all users 
-    public async getAllUsers(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const page = parseInt(req.query.page as string) || parseInt(req.body?.page) || 1;
-            const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
-            
-            // Legacy query params (for backward compatibility)
-            const status = req.query.status as string | undefined;
-            const role = req.query.role as string | undefined;
-            
-            // Advanced filters from body
-            const filters = req.body?.filters || [];
-            const search = req.body?.search || '';
-            const sortBy = req.body?.sortBy || 'createdAt';
-            const sortOrder = req.body?.sortOrder || 'desc';
-
-            const result = await this.adminUserService.getAllUsers(
-                page, 
-                limit,
-                status,      
-                role,        
-                filters,     
-                search,      
-                sortBy,      
-                sortOrder    
-            );
-            
-            return sendSuccessResponse(res, SuccessResponses.OK('Users retrieved successfully', result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getAllUsers',
-                errorMsg: `Failed to get users: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-    // Approve or reject user
-    public async approveUser(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const approvalData: IApprovalRequest = req.body;
-            const adminId = req.user._id;
-
-            const result = await this.adminUserService.approveUser(approvalData, adminId);
-
-            const message = result.status === 'approved'
-                ? 'User approved successfully'
-                : 'User rejected successfully';
-
-            return sendSuccessResponse(res, SuccessResponses.OK(message, result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'approveUser',
-                errorMsg: `User approval failed: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
-        }
-    }
-
-    // Update user role
-    public async updateUserRole(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const { userId } = req.params;
-            const { role, reason }: IRoleUpdateRequest = req.body;
-            const adminId = req.user._id;
-
-            const result = await this.adminUserService.updateUserRole(userId, role, adminId, reason);
-
-            return sendSuccessResponse(res, SuccessResponses.OK('User role updated successfully', {
-                userId: result.user._id,
-                email: result.user.email,
-                name: result.user.name,
-                oldRole: result.oldRole,
-                newRole: result.newRole,
-                updatedBy: req.user.name,
-                updatedAt: new Date(),
-                reason: result.reason || null
-            }));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'updateUserRole',
-                errorMsg: `Failed to update user role: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(error.message));
-        }
-    }
-
-    // Get users with file filter options
-    public async getUsersWithFiles(req: Request, res: Response): Promise<Response> {
-        try {
-            if (!this.checkAdminAccess(req, res)) return res;
-
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 20;
-            const hasFiles = req.query.hasFiles === 'true' ? true : req.query.hasFiles === 'false' ? false : undefined;
-            const approvalStatus = req.query.approvalStatus as string;
-
-            const result = await this.adminUserService.getUsersWithFiles(page, limit, hasFiles, approvalStatus);
-            return sendSuccessResponse(res, SuccessResponses.OK('Users retrieved successfully', result));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getUsersWithFiles',
-                errorMsg: `Failed to get users with files: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-
-    async createPackage(req: Request, res: Response) {
-        try {
-            const { name, amount, pack_type, duration_days, max_products, features } = req.body;
-
-            // Validation
-            if (!name || !amount || !pack_type || !duration_days) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Name, amount, pack_type, and duration_days are required'));
-            }
-
-            if (amount < 0) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Amount must be a positive number'));
-            }
-
-            if (duration_days < 1) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Duration days must be at least 1'));
-            }
-
-            const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
-            if (!validPackTypes.includes(pack_type.toLowerCase())) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`));
-            }
-
-            // Check if package with same name already exists
-            const existingPackage = await Package.findOne({ name: name.trim() });
-            if (existingPackage) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Package with this name already exists'));
-            }
-
-            // Create new package
-            const newPackage = await Package.create({
-                name: name.trim(),
-                amount: Number(amount),
-                pack_type: pack_type.toLowerCase(),
-                duration_days: Number(duration_days),
-                max_products: max_products ? Number(max_products) : undefined,
-                features: features || [],
-                createdAt: new Date(),
-                updatedAt: new Date()
-            });
-
-            logSuccess({
-                userId: req.user?._id || 'admin',
-                functionName: 'createPackage',
-                successMsg: `Package created: ${newPackage._id}`
-            });
-
-            return sendSuccessResponse(res, SuccessResponses.CREATED('Package created successfully', newPackage));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'createPackage',
-                errorMsg: `Failed to create package: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-
-    async updatePackage(req: Request, res: Response) {
-        try {
-            const { id } = req.params;
-            const { name, amount, pack_type, duration_days, max_products, features } = req.body;
-
-            // Find package
-            const packageToUpdate = await Package.findById(id);
-            if (!packageToUpdate) {
-                return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
-            }
-
-            // Validation
-            if (amount !== undefined && amount < 0) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Amount must be a positive number'));
-            }
-
-            if (duration_days !== undefined && duration_days < 1) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Duration days must be at least 1'));
-            }
-
-            const validPackTypes = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
-            if (pack_type !== undefined && !validPackTypes.includes(pack_type.toLowerCase())) {
-                return sendErrorResponse(res, ErrorResponses.BAD_REQUEST(`Pack type must be one of: ${validPackTypes.join(', ')}`));
-            }
-
-            // Check if new name conflicts with existing package
-            if (name && name.trim() !== packageToUpdate.name) {
-                const existingPackage = await Package.findOne({ name: name.trim(), _id: { $ne: id } });
-                if (existingPackage) {
-                    return sendErrorResponse(res, ErrorResponses.BAD_REQUEST('Package with this name already exists'));
-                }
-            }
-
-            // Update fields
-            if (name !== undefined) packageToUpdate.name = name.trim();
-            if (amount !== undefined) packageToUpdate.amount = Number(amount);
-            if (pack_type !== undefined) packageToUpdate.pack_type = pack_type.toLowerCase();
-            if (duration_days !== undefined) packageToUpdate.duration_days = Number(duration_days);
-            if (max_products !== undefined) packageToUpdate.max_products = max_products ? Number(max_products) : null;
-            if (features !== undefined) packageToUpdate.features = features;
-            packageToUpdate.updatedAt = new Date();
-
-            await packageToUpdate.save();
-
-            logError({
-                userId: req.user?._id || 'admin',
-                functionName: 'updatePackage',
-                errorMsg: `Package updated: ${packageToUpdate._id}`
-            });
-
-            return sendSuccessResponse(res, SuccessResponses.OK('Package updated successfully', packageToUpdate));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'updatePackage',
-                errorMsg: `Failed to update package: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-
-    async deletePackage(req: Request, res: Response) {
-        try {
-            const { id } = req.params;
-
-            // Find and delete package
-            const deletedPackage = await Package.findByIdAndDelete(id);
-            if (!deletedPackage) {
-                return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
-            }
-
-            logSuccess({
-                userId: req.user?._id || 'admin',
-                functionName: 'deletePackage',
-                successMsg: `Package deleted: ${deletedPackage._id}`
-            });
-
-            return sendSuccessResponse(res, SuccessResponses.OK('Package deleted successfully', {
-                id: deletedPackage._id,
-                name: deletedPackage.name
-            }));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'deletePackage',
-                errorMsg: `Failed to delete package: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
-
-
-    async getAllPackages(req: Request, res: Response) {
-        try {
-            const packages = await Package.find().sort({ createdAt: -1 });
-
-            return sendSuccessResponse(res, SuccessResponses.OK('Packages retrieved successfully', {
-                total: packages.length,
-                packages
-            }));
-
-        } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'getAllPackages',
-                errorMsg: `Failed to get packages: ${error.message}`
-            });
-            return sendErrorResponse(res, ErrorResponses.INTERNAL_ERROR());
-        }
-    }
+  }
 }

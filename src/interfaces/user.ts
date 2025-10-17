@@ -44,7 +44,7 @@ export interface IRegisterRequest {
   phone_number: string;
   whatsapp_number?: string;
   vat_number: string;
-  id_proof: any; 
+  id_proof: any;
 }
 
 export interface IRegisterResponse {

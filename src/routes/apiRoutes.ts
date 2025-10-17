@@ -7,52 +7,42 @@ const router = express.Router();
 const apiController = new ApiController();
 
 // Public route - Get all products from users with active packages
-router.post('/public/products', 
-  (req: Request, res: Response) => apiController.getPublicProducts(req, res)
+router.post('/public/products', (req: Request, res: Response) =>
+  apiController.getPublicProducts(req, res)
 );
 
 router.use(authenticateToken);
 
 // POST /api/add_product - Create new product
-router.post('/add_product', 
-  validateProductCreation,
-  (req: Request, res: Response) => apiController.store(req, res)
+router.post('/add_product', validateProductCreation, (req: Request, res: Response) =>
+  apiController.store(req, res)
 );
 
 // POST /api/products - Get all products for authenticated user
-router.post('/products', 
-  (req: Request, res: Response) => apiController.index(req, res)
-);
+router.post('/products', (req: Request, res: Response) => apiController.index(req, res));
 
 // GET /api/products/:id - Get single product by ID or PID
-router.get('/products/:id', 
-  (req: Request, res: Response) => apiController.show(req, res)
-);
+router.get('/products/:id', (req: Request, res: Response) => apiController.show(req, res));
 
 // PUT /api/products/:id - Update product
-router.put('/update_product/:id', 
-  validateProductUpdate,
-  (req: Request, res: Response) => apiController.update(req, res)
+router.put('/update_product/:id', validateProductUpdate, (req: Request, res: Response) =>
+  apiController.update(req, res)
 );
 
-router.delete('/delete_product/:id', 
-  (req: Request, res: Response) => apiController.destroy(req, res)
+router.delete('/delete_product/:id', (req: Request, res: Response) =>
+  apiController.destroy(req, res)
 );
 
 // Package Routes
 // GET /api/packages - Get all active packages
-router.get('/packages', 
-  (req: Request, res: Response) => apiController.packages(req, res)
-);
+router.get('/packages', (req: Request, res: Response) => apiController.packages(req, res));
 
 // POST /api/buy_package - Buy a package (create Stripe checkout)
-router.post('/buy_package', 
-  (req: Request, res: Response) => apiController.buy_package(req, res)
-);
+router.post('/buy_package', (req: Request, res: Response) => apiController.buy_package(req, res));
 
 // GET /api/package_history - Get user's package history
-router.get('/package_history', 
-  (req: Request, res: Response) => apiController.package_history(req, res)
+router.get('/package_history', (req: Request, res: Response) =>
+  apiController.package_history(req, res)
 );
 
 export default router;
