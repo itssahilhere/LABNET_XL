@@ -140,7 +140,7 @@ userSchema.statics.findByCredentials = async function (email: string, password: 
 
     if (user.role !== 'admin' && user.approval_status !== 'approved') {
         if (user.approval_status === 'pending') {
-            throw new Error('Your account is pending admin approval');
+            throw new Error('Your account is in pending. Please wait for approval.');
         } else if (user.approval_status === 'rejected') {
             throw new Error('Your account has been rejected. Please contact admin');
         }

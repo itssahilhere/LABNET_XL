@@ -1,6 +1,7 @@
 import User from '../models/User.model';
 import { IApprovalRequest } from '../interfaces/user';
 import { logError, logSuccess } from '../utils/logger';
+import { QueryBuilder } from '../utils/queryBuilder';
 
 export class AdminUserService {
     // Get all pending users for approval
@@ -30,21 +31,52 @@ export class AdminUserService {
     }
 
     // Get all users with filtering
-    async getAllUsers(page: number = 1, limit: number = 20, status?: string, role?: string) {
+    async getAllUsers(
+        page: number = 1, 
+        limit: number = 20, 
+        status?: string, 
+        role?: string,
+        advancedFilters: any[] = [],
+        search: string = '',
+        sortBy: string = 'createdAt',
+        sortOrder: string = 'desc'
+    ) {
         const skip = (page - 1) * limit;
-        let query: any = {};
-
-        if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-            query.approval_status = status;
+        
+        // Build filters using QueryBuilder - NO RESTRICTIONS, ALL FIELDS SUPPORTED
+        const filters = [];
+        
+        // Add legacy query param filters if provided (for backward compatibility)
+        if (status) {
+            filters.push({ field: 'approval_status', operation: 'equals', value: status });
         }
-
-        if (role && ['user', 'admin'].includes(role)) {
-            query.role = role;
+        if (role) {
+            filters.push({ field: 'role', operation: 'equals', value: role });
         }
+        
+        // Merge with advanced filters from body - ALL FIELDS ALLOWED
+        const allFilters = [...filters, ...advancedFilters];
+        
+        const query = QueryBuilder.buildAdvancedFilters(allFilters);
+        
+        // Add global search if provided - searches across all text fields
+        if (search && search.trim()) {
+            const searchFields = [
+                'name', 'email', 'uid', 'phone_no', 'whatsapp_no', 
+                'company_name', 'location', 'role', 'approval_status',
+                'rejection_reason'
+            ];
+            const searchQuery = QueryBuilder.buildGlobalSearch(search, searchFields);
+            if (searchQuery) {
+                Object.assign(query, searchQuery);
+            }
+        }
+        
+        const sortObject = QueryBuilder.buildSort(sortBy, sortOrder);
 
         const users = await User.find(query)
             .select('-password -show_pass')
-            .sort({ createdAt: -1 })
+            .sort(sortObject)
             .skip(skip)
             .limit(limit);
 
@@ -54,7 +86,9 @@ export class AdminUserService {
             users,
             total: totalUsers,
             currentPage: page,
-            totalPages: Math.ceil(totalUsers / limit)
+            totalPages: Math.ceil(totalUsers / limit),
+            appliedFilters: allFilters,
+            search: search || undefined
         };
     }
 
@@ -141,8 +175,19 @@ export class AdminUserService {
     // Get users with file filter options
     async getUsersWithFiles(page: number = 1, limit: number = 20, hasFiles?: boolean, approvalStatus?: string) {
         const skip = (page - 1) * limit;
-        let query: any = { role: 'user' };
         
+        // Build filters using QueryBuilder
+        const filters = [
+            { field: 'role', operation: 'equals', value: 'user' }
+        ];
+
+        if (approvalStatus && ['pending', 'approved', 'rejected'].includes(approvalStatus)) {
+            filters.push({ field: 'approval_status', operation: 'equals', value: approvalStatus });
+        }
+
+        const query = QueryBuilder.buildAdvancedFilters(filters);
+        
+        // Handle file existence filter manually (special case)
         if (hasFiles !== undefined) {
             if (hasFiles) {
                 query.id_proof = { $exists: true, $ne: '' };
@@ -153,14 +198,12 @@ export class AdminUserService {
                 ];
             }
         }
-
-        if (approvalStatus && ['pending', 'approved', 'rejected'].includes(approvalStatus)) {
-            query.approval_status = approvalStatus;
-        }
+        
+        const sortObject = QueryBuilder.buildSort('createdAt', 'desc');
 
         const users = await User.find(query)
             .select('_id name email uid id_proof approval_status createdAt')
-            .sort({ createdAt: -1 })
+            .sort(sortObject)
             .skip(skip)
             .limit(limit);
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { IApprovalRequest, IRoleUpdateRequest } from '../interfaces/user';
-import { logError } from '../utils/logger';
+import { logError, logSuccess } from '../utils/logger';
 import { sendErrorResponse, sendSuccessResponse, ErrorResponses, SuccessResponses } from '../utils/responses';
 import { AdminUserService } from '../services/AdminUserService';
 import { AdminDashboardService } from '../services/AdminDashboardService';
@@ -63,17 +63,35 @@ export class AdminController {
         }
     }
 
-    // Get all users with filtering
+    // Get all users 
     public async getAllUsers(req: Request, res: Response): Promise<Response> {
         try {
             if (!this.checkAdminAccess(req, res)) return res;
 
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 20;
-            const status = req.query.status as string;
-            const role = req.query.role as string;
+            const page = parseInt(req.query.page as string) || parseInt(req.body?.page) || 1;
+            const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
+            
+            // Legacy query params (for backward compatibility)
+            const status = req.query.status as string | undefined;
+            const role = req.query.role as string | undefined;
+            
+            // Advanced filters from body
+            const filters = req.body?.filters || [];
+            const search = req.body?.search || '';
+            const sortBy = req.body?.sortBy || 'createdAt';
+            const sortOrder = req.body?.sortOrder || 'desc';
 
-            const result = await this.adminUserService.getAllUsers(page, limit, status, role);
+            const result = await this.adminUserService.getAllUsers(
+                page, 
+                limit,
+                status,      
+                role,        
+                filters,     
+                search,      
+                sortBy,      
+                sortOrder    
+            );
+            
             return sendSuccessResponse(res, SuccessResponses.OK('Users retrieved successfully', result));
 
         } catch (error: any) {
@@ -95,9 +113,9 @@ export class AdminController {
             const adminId = req.user._id;
 
             const result = await this.adminUserService.approveUser(approvalData, adminId);
-            
-            const message = result.status === 'approved' 
-                ? 'User approved successfully' 
+
+            const message = result.status === 'approved'
+                ? 'User approved successfully'
                 : 'User rejected successfully';
 
             return sendSuccessResponse(res, SuccessResponses.OK(message, result));
@@ -167,13 +185,7 @@ export class AdminController {
         }
     }
 
-    // ==================== Package Management ====================
 
-    /**
-     * Create a new package
-     * POST /api/admin/packages
-     * Body: { name, amount, pack_type, duration_days, max_products, features }
-     */
     async createPackage(req: Request, res: Response) {
         try {
             const { name, amount, pack_type, duration_days, max_products, features } = req.body;
@@ -214,10 +226,10 @@ export class AdminController {
                 updatedAt: new Date()
             });
 
-            logError({
+            logSuccess({
                 userId: req.user?._id || 'admin',
                 functionName: 'createPackage',
-                errorMsg: `Package created: ${newPackage._id}`
+                successMsg: `Package created: ${newPackage._id}`
             });
 
             return sendSuccessResponse(res, SuccessResponses.CREATED('Package created successfully', newPackage));
@@ -232,11 +244,7 @@ export class AdminController {
         }
     }
 
-    /**
-     * Update an existing package
-     * PUT /api/admin/packages/:id
-     * Body: { name?, amount?, pack_type?, duration_days?, max_products?, features? }
-     */
+
     async updatePackage(req: Request, res: Response) {
         try {
             const { id } = req.params;
@@ -299,10 +307,7 @@ export class AdminController {
         }
     }
 
-    /**
-     * Delete a package
-     * DELETE /api/admin/packages/:id
-     */
+
     async deletePackage(req: Request, res: Response) {
         try {
             const { id } = req.params;
@@ -313,15 +318,15 @@ export class AdminController {
                 return sendErrorResponse(res, ErrorResponses.NOT_FOUND('Package not found'));
             }
 
-            logError({
+            logSuccess({
                 userId: req.user?._id || 'admin',
                 functionName: 'deletePackage',
-                errorMsg: `Package deleted: ${deletedPackage._id}`
+                successMsg: `Package deleted: ${deletedPackage._id}`
             });
 
-            return sendSuccessResponse(res, SuccessResponses.OK('Package deleted successfully', { 
+            return sendSuccessResponse(res, SuccessResponses.OK('Package deleted successfully', {
                 id: deletedPackage._id,
-                name: deletedPackage.name 
+                name: deletedPackage.name
             }));
 
         } catch (error: any) {
@@ -334,14 +339,11 @@ export class AdminController {
         }
     }
 
-    /**
-     * Get all packages (for admin management)
-     * GET /api/admin/packages
-     */
+
     async getAllPackages(req: Request, res: Response) {
         try {
             const packages = await Package.find().sort({ createdAt: -1 });
-            
+
             return sendSuccessResponse(res, SuccessResponses.OK('Packages retrieved successfully', {
                 total: packages.length,
                 packages

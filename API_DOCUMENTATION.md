@@ -727,13 +727,281 @@ Authorization: Bearer <admin_token>
 
 Base path: `/api`
 
-**All product routes require authentication**
+### 1. Get Public Products (No Authentication Required)
 
-### 1. Create Product
+**POST** `/api/public/products`
+
+Get all products from users with valid active packages. This is a public endpoint that doesn't require authentication.
+
+**Query Parameters (Pagination only):**
+- `page` (number, optional): Page number (default: 1)
+- `limit` (number, optional): Items per page (default: 20)
+
+**Request Body:**
+```json
+{
+  "filters": [
+    {
+      "field": "shape",
+      "operation": "in",
+      "value": ["Round", "Princess"]
+    },
+    {
+      "field": "color",
+      "operation": "equals",
+      "value": "D"
+    },
+    {
+      "field": "carat",
+      "operation": "between",
+      "value": [1.0, 2.0]
+    },
+    {
+      "field": "total_price",
+      "operation": "lte",
+      "value": 50000
+    }
+  ],
+  "search": "GIA",
+  "sortBy": "total_price",
+  "sortOrder": "asc"
+}
+```
+
+**All body fields are optional**
+
+**Available Filter Operations:**
+- `equals` / `eq` - Exact match
+- `notEquals` / `ne` - Not equal to
+- `contains` - Contains text (case-insensitive)
+- `notContains` - Does not contain text
+- `startsWith` - Starts with text
+- `endsWith` - Ends with text
+- `in` - Value is in array
+- `notIn` - Value not in array
+- `gt` / `greaterThan` - Greater than
+- `gte` / `greaterThanOrEqual` - Greater than or equal
+- `lt` / `lessThan` - Less than
+- `lte` / `lessThanOrEqual` - Less than or equal
+- `between` / `range` - Between two values [min, max]
+- `exists` - Field exists (true/false)
+- `regex` - Regular expression match
+
+**Searchable Fields (Global Search):**
+All text fields are searchable when using the `search` parameter:
+- stock_id, product_id, pid
+- shape, color, clarity, cut, polish, symmetry
+- fluorescence, laboratory, growth_type
+- certificate_number
+- fancy_color, fancy_color_intensity, fancy_color_overtone
+- seller_name, seller_company, seller_location, seller_email
+- measurements
+
+**Filterable Fields:**
+You can apply filters to any product field:
+- String fields: stock_id, product_id, pid, shape, color, clarity, cut, polish, symmetry, fluorescence, laboratory, growth_type, fancy_color, fancy_color_intensity, fancy_color_overtone, seller_name, seller_company, seller_location, certificate_number, measurements
+- Numeric fields: carat, price_per_carat, total_price, depth_percentage, table_percentage
+
+**Example Requests:**
+
+1. **Filter by multiple shapes:**
+```json
+{
+  "filters": [
+    {
+      "field": "shape",
+      "operation": "in",
+      "value": ["Round", "Princess", "Oval"]
+    }
+  ]
+}
+```
+
+2. **Filter by price range:**
+```json
+{
+  "filters": [
+    {
+      "field": "total_price",
+      "operation": "between",
+      "value": [10000, 50000]
+    }
+  ]
+}
+```
+
+3. **Filter by exact color:**
+```json
+{
+  "filters": [
+    {
+      "field": "color",
+      "operation": "equals",
+      "value": "D"
+    }
+  ]
+}
+```
+
+4. **Combined filters:**
+```json
+{
+  "filters": [
+    {
+      "field": "shape",
+      "operation": "in",
+      "value": ["Round", "Princess"]
+    },
+    {
+      "field": "color",
+      "operation": "equals",
+      "value": "D"
+    },
+    {
+      "field": "carat",
+      "operation": "between",
+      "value": [1.0, 2.0]
+    },
+    {
+      "field": "cut",
+      "operation": "equals",
+      "value": "Excellent"
+    },
+    {
+      "field": "laboratory",
+      "operation": "in",
+      "value": ["GIA", "IGI"]
+    }
+  ],
+  "sortBy": "total_price",
+  "sortOrder": "asc"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": true,
+  "message": "Products retrieved successfully",
+  "data": {
+    "products": [
+      {
+        "_id": "60d5ec49f1b2c8b5f8e4a5d1",
+        "pid": "PID0001",
+        "product_id": "LNX1001_STOCK001",
+        "stock_id": "STOCK001",
+        "shape": "Round",
+        "carat": 1.5,
+        "color": "D",
+        "clarity": "VVS1",
+        "cut": "Excellent",
+        "polish": "Excellent",
+        "symmetry": "Excellent",
+        "fluorescence": "None",
+        "laboratory": "GIA",
+        "certificate_number": "123456789",
+        "depth_percentage": 61.5,
+        "table_percentage": 57.0,
+        "price_per_carat": 10000,
+        "total_price": 15000,
+        "growth_type": "Natural",
+        "video_url": "https://example.com/video.mp4",
+        "image_url": "https://example.com/image.jpg",
+        "certificate_url": "https://example.com/cert.pdf",
+        "measurements": "7.50*7.48*4.62",
+        "seller_id": {
+          "_id": "60d5ec49f1b2c8b5f8e4a5b1",
+          "name": "John Doe",
+          "company_name": "Diamond Corp",
+          "uid": "LNX1001",
+          "email": "john@example.com",
+          "phone_no": "+1234567890",
+          "whatsapp_no": "+1234567890",
+          "location": "New York"
+        },
+        "createdAt": "2025-10-17T10:30:00.000Z",
+        "updatedAt": "2025-10-17T10:30:00.000Z"
+      }
+    ],
+    "pagination": {
+      "current_page": 1,
+      "per_page": 20,
+      "total": 150,
+      "total_pages": 8
+    },
+    "filters": {
+      "available_shapes": ["Round", "Princess", "Oval", "Cushion", "Emerald"],
+      "available_colors": ["D", "E", "F", "G", "H"],
+      "available_clarities": ["IF", "VVS1", "VVS2", "VS1", "VS2"],
+      "available_cuts": ["Excellent", "Very Good", "Good"],
+      "available_polish": ["Excellent", "Very Good", "Good"],
+      "available_symmetry": ["Excellent", "Very Good", "Good"],
+      "available_fluorescence": ["None", "Faint", "Medium", "Strong"],
+      "available_laboratories": ["GIA", "IGI", "HRD"],
+      "available_growth_types": ["Natural", "Lab Grown"],
+      "price_range": {
+        "min": 1000,
+        "max": 50000
+      },
+      "carat_range": {
+        "min": 0.5,
+        "max": 5.0
+      },
+      "depth_range": {
+        "min": 58.5,
+        "max": 64.2
+      },
+      "table_range": {
+        "min": 53.0,
+        "max": 62.0
+      }
+    },
+    "total_active_sellers": 45
+  }
+}
+```
+
+**Response (200 OK - No Products):**
+```json
+{
+  "status": true,
+  "message": "No products found from users with active packages",
+  "data": {
+    "products": [],
+    "pagination": {
+      "current_page": 1,
+      "per_page": 20,
+      "total": 0,
+      "total_pages": 0
+    },
+    "filters": {
+      "available_shapes": [],
+      "available_colors": [],
+      "available_clarities": [],
+      "available_cuts": [],
+      "available_polish": [],
+      "available_symmetry": [],
+      "available_fluorescence": [],
+      "available_laboratories": [],
+      "available_growth_types": [],
+      "price_range": { "min": 0, "max": 0 },
+      "carat_range": { "min": 0, "max": 0 },
+      "depth_range": { "min": 0, "max": 0 },
+      "table_range": { "min": 0, "max": 0 }
+    }
+  }
+}
+```
+
+---
+
+**The following product routes require authentication**
+
+### 2. Create Product
 
 **POST** `/api/add_product`
 
-Create a new product
+Create a new product (requires authentication and active package)
 
 **Headers:**
 ```
@@ -810,7 +1078,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 2. Get All Products
+### 3. Get All Products (User's Own)
 
 **GET** `/api/products`
 
@@ -856,7 +1124,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 3. Get Single Product
+### 4. Get Single Product
 
 **GET** `/api/products/:id`
 
@@ -905,7 +1173,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 4. Update Product
+### 5. Update Product
 
 **PUT** `/api/update_product/:id`
 
@@ -954,7 +1222,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 5. Delete Product(s)
+### 6. Delete Product(s)
 
 **DELETE** `/api/delete_product/:id`
 
@@ -996,7 +1264,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 6. Get All Packages
+### 7. Get All Packages
 
 **GET** `/api/packages`
 
@@ -1045,7 +1313,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 7. Buy Package
+### 8. Buy Package
 
 **POST** `/api/buy_package?package_id=<package_id>`
 
@@ -1076,7 +1344,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 8. Get Package History
+### 9. Get Package History
 
 **GET** `/api/package_history`
 

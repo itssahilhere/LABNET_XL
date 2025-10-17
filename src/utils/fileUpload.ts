@@ -22,8 +22,12 @@ const s3Client = new S3Client({
   },
 });
 
-// Common upload function
-export async function uploadFiles(req: Request, fileType: string): Promise<{ urls: string[] }> {
+// Common upload function with configurable file size limit
+export async function uploadFiles(
+  req: Request, 
+  fileType: string, 
+  maxFileSize: number = 2 * 1024 * 1024 // Default 2MB
+): Promise<{ urls: string[] }> {
   const fileObjects = req.body?.fileDetails as IFileObject[];
   if (!fileObjects || fileObjects.length === 0 || fileObjects.length > 5) {
     throw { code: 400, message: 'Invalid file input. Please provide 1-5 files.' };
@@ -35,8 +39,9 @@ export async function uploadFiles(req: Request, fileType: string): Promise<{ url
       throw { code: 400, message: 'Missing file data. Each file must have base64 content and fileName.' };
     }
     
-    if (file.size > 2 * 1024 * 1024) {
-      throw { code: 400, message: `File "${file.fileName}" is too large (max 2MB)`};
+    if (file.size > maxFileSize) {
+      const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(0);
+      throw { code: 400, message: `File "${file.fileName}" is too large (max ${maxSizeMB}MB)`};
     }
 
     try{

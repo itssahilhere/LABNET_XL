@@ -238,7 +238,7 @@ export class UserController {
 
             if (updates.password) {
                 updates.show_pass = updates.password; 
-                updates.password = await hashPassword(updates.password, 10); // Hash the password
+                updates.password = await hashPassword(updates.password, 10); 
             }
 
             // Handle S3 file upload for ID proof
@@ -294,7 +294,6 @@ export class UserController {
                 return sendErrorResponse(res, ErrorResponses.UNAUTHORIZED());
             }
 
-            // Get dashboard stats
             const dashboardStats = await this.dashboardService.getDashboardStats(user._id);
 
             return sendSuccessResponse(res, SuccessResponses.OK('Dashboard statistics retrieved successfully', dashboardStats));

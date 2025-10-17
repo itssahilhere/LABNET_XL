@@ -19,8 +19,9 @@ router.get('/users/pending',
     (req: Request, res: Response) => adminController.getPendingUsers(req, res)
 );
 
-// GET /api/admin/users - Get all users with filtering
-router.get('/users', 
+
+// POST /api/admin/users - Get all users with advanced filtering (body filters)
+router.post('/users', 
     (req: Request, res: Response) => adminController.getAllUsers(req, res)
 );
 

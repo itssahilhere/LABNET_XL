@@ -6,6 +6,11 @@ import { validateProductCreation, validateProductUpdate } from '../middleware/pr
 const router = express.Router();
 const apiController = new ApiController();
 
+// Public route - Get all products from users with active packages
+router.post('/public/products', 
+  (req: Request, res: Response) => apiController.getPublicProducts(req, res)
+);
+
 router.use(authenticateToken);
 
 // POST /api/add_product - Create new product
@@ -14,8 +19,8 @@ router.post('/add_product',
   (req: Request, res: Response) => apiController.store(req, res)
 );
 
-// GET /api/products - Get all products for authenticated user
-router.get('/products', 
+// POST /api/products - Get all products for authenticated user
+router.post('/products', 
   (req: Request, res: Response) => apiController.index(req, res)
 );
 
@@ -29,6 +34,7 @@ router.put('/update_product/:id',
   validateProductUpdate,
   (req: Request, res: Response) => apiController.update(req, res)
 );
+
 router.delete('/delete_product/:id', 
   (req: Request, res: Response) => apiController.destroy(req, res)
 );

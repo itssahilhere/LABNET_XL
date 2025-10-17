@@ -6,37 +6,110 @@ import PaymentLog from '../models/PaymentLog.model';
 import { IProductCreateRequest } from '../middleware/productValidation';
 import { logError, logSuccess } from '../utils/logger';
 import { StripeService, StripeCheckoutSessionData } from '../utils/stripe';
+import { QueryBuilder } from '../utils/queryBuilder';
 
 export class ApiController {
+    
+    private checkAuth(req: Request, res: Response): boolean {
+        if (!req.user) {
+            res.status(401).json({
+                status: false,
+                message: 'Authentication required'
+            });
+            return false;
+        }
+        return true;
+    }
+
+    private async findUserProduct(userId: string, productId: string) {
+        return await Product.findOne({
+            $and: [
+                { seller_id: userId },
+                { $or: [{ _id: productId }, { pid: productId }] }
+            ]
+        });
+    }
+
+    /**
+     * Handle common errors and return appropriate response
+     */
+    private handleError(res: Response, error: any, functionName: string, userId: string = 'unknown'): Response {
+        logError({
+            userId,
+            functionName,
+            errorMsg: `${functionName} failed: ${error.message}`
+        });
+
+        if (error.code === 11000 || error.name === 'MongoServerError') {
+            const field = Object.keys(error.keyPattern || {})[0] || 'field';
+            return res.status(409).json({
+                status: false,
+                message: `Duplicate ${field}: This value already exists`
+            });
+        }
+
+        // Handle validation errors
+        if (error.name === 'ValidationError') {
+            const errors: Record<string, string> = {};
+            for (const field in error.errors) {
+                errors[field] = error.errors[field].message;
+            }
+            return res.status(422).json({
+                status: false,
+                message: 'Validation failed',
+                errors
+            });
+        }
+
+        // Handle cast errors (invalid ObjectId, etc.)
+        if (error.name === 'CastError') {
+            return res.status(400).json({
+                status: false,
+                message: `Invalid ${error.path}: ${error.value}`
+            });
+        }
+
+        // Generic error
+        return res.status(500).json({
+            status: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+
+    /**
+     * Check if user has active package
+     */
+    private hasActivePackage(user: any): { valid: boolean; message?: string } {
+        if (!user.package?.end_date) {
+            return { valid: false, message: 'You can add products only after buying a package.' };
+        }
+
+        const today = new Date();
+        const packEndDate = new Date(user.package?.end_date);
+        if (packEndDate < today) {
+            return { valid: false, message: 'Your package has expired. Please buy a package first.' };
+        }
+
+        return { valid: true };
+    }
+
+
     public async store(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const user = req.user;
             const productData: IProductCreateRequest = req.body;
 
-            if (!user.package?.end_date) {
+            const packageCheck = this.hasActivePackage(user);
+            if (!packageCheck.valid) {
                 return res.status(403).json({
                     status: false,
-                    message: 'You can add products only after buying a package.'
+                    message: packageCheck.message
                 });
             }
 
-            const today = new Date();
-            const packEndDate = new Date(user.package?.end_date);
-            if (packEndDate < today) {
-                return res.status(403).json({
-                    status: false,
-                    message: 'Your package has expired. Please buy a package first.'
-                });
-            }
-
-            // Check if stock_id is unique for this seller
             const existingProduct = await Product.findOne({
                 seller_id: user._id,
                 stock_id: productData.stock_id
@@ -49,12 +122,11 @@ export class ApiController {
                 });
             }
 
+            // Generate unique identifiers
             const pid = await (Product as any).generateUniquePid();
-
-            // Generate unique product_id as {user_uid}_{stock_id}
             const product_id = `${user.uid}_${productData.stock_id}`;
 
-            // Check if product_id is unique (shouldn't happen if stock_id is unique per user)
+            // Check for duplicate product_id
             const existingProductId = await Product.findOne({ product_id });
             if (existingProductId) {
                 return res.status(409).json({
@@ -63,39 +135,11 @@ export class ApiController {
                 });
             }
 
-            // Create the product
+            // Create product
             const product = new Product({
                 pid,
                 product_id,
-                stock_id: productData.stock_id,
-                shape: productData.shape,
-                carat: productData.carat,
-                color: productData.color,
-                clarity: productData.clarity,
-                cut: productData.cut,
-                polish: productData.polish,
-                symmetry: productData.symmetry,
-                fluorescence: productData.fluorescence,
-                laboratory: productData.laboratory,
-                certificate_number: productData.certificate_number,
-                depth_percentage: productData.depth_percentage,
-                table_percentage: productData.table_percentage,
-                price_per_carat: productData.price_per_carat,
-                total_price: productData.total_price,
-                growth_type: productData.growth_type,
-                fancy_color: productData.fancy_color,
-                fancy_color_intensity: productData.fancy_color_intensity,
-                fancy_color_overtone: productData.fancy_color_overtone,
-                seller_name: productData.seller_name,
-                seller_company: productData.seller_company,
-                seller_location: productData.seller_location,
-                seller_phone: productData.seller_phone,
-                seller_whatsapp: productData.seller_whatsapp,
-                seller_email: productData.seller_email,
-                video_url: productData.video_url,
-                image_url: productData.image_url,
-                certificate_url: productData.certificate_url,
-                measurements: productData.measurements,
+                ...productData,
                 seller_id: user._id
             });
 
@@ -107,107 +151,58 @@ export class ApiController {
                 successMsg: `Product created successfully: ${product_id}`
             });
 
-            // Return success response
             return res.status(201).json({
                 status: true,
                 message: 'Product added successfully.',
-                product: {
-                    id: product._id,
-                    pid: product.pid,
-                    product_id: product.product_id,
-                    stock_id: product.stock_id,
-                    shape: product.shape,
-                    carat: product.carat,
-                    color: product.color,
-                    clarity: product.clarity,
-                    cut: product.cut,
-                    polish: product.polish,
-                    symmetry: product.symmetry,
-                    fluorescence: product.fluorescence,
-                    laboratory: product.laboratory,
-                    certificate_number: product.certificate_number,
-                    depth_percentage: product.depth_percentage,
-                    table_percentage: product.table_percentage,
-                    price_per_carat: product.price_per_carat,
-                    total_price: product.total_price,
-                    growth_type: product.growth_type,
-                    fancy_color: product.fancy_color,
-                    fancy_color_intensity: product.fancy_color_intensity,
-                    fancy_color_overtone: product.fancy_color_overtone,
-                    seller_name: product.seller_name,
-                    seller_company: product.seller_company,
-                    seller_location: product.seller_location,
-                    seller_phone: product.seller_phone,
-                    seller_whatsapp: product.seller_whatsapp,
-                    seller_email: product.seller_email,
-                    video_url: product.video_url,
-                    image_url: product.image_url,
-                    certificate_url: product.certificate_url,
-                    measurements: product.measurements,
-                    seller_id: product.seller_id,
-                    created_at: product.createdAt,
-                    updated_at: product.updatedAt
-                }
+                product
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'store',
-                errorMsg: `Product creation failed: ${error.message}`
-            });
-
-            // Handle MongoDB duplicate key error
-            if (error.code === 11000 || error.name === 'MongoServerError') {
-                const field = Object.keys(error.keyPattern || {})[0] || 'field';
-                return res.status(409).json({
-                    status: false,
-                    message: `Duplicate ${field}: This value already exists`
-                });
-            }
-
-            // Handle validation errors
-            if (error.name === 'ValidationError') {
-                const errors: Record<string, string> = {};
-                for (const field in error.errors) {
-                    errors[field] = error.errors[field].message;
-                }
-                return res.status(422).json({
-                    status: false,
-                    message: 'Validation failed',
-                    errors
-                });
-            }
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
+            return this.handleError(res, error, 'store', req.user?._id || 'unknown');
         }
     }
 
-    // Get all products for authenticated user
+    // Get all products for authenticated user (POST only)
     public async index(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
-            const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 20;
+            const page = parseInt(req.query.page as string) || parseInt(req.body?.page) || 1;
+            const limit = parseInt(req.query.limit as string) || parseInt(req.body?.limit) || 20;
             const skip = (page - 1) * limit;
 
-            // Get user's products
-            const products = await Product.find({ seller_id: req.user._id })
-                .sort({ createdAt: -1 })
+            const { filters: userFilters = [], search, sortBy = 'createdAt', sortOrder = 'desc' } = req.body || {};
+
+            // Build filters - always include seller_id
+            const filters = [
+                { field: 'seller_id', operation: 'equals', value: req.user._id },
+                ...userFilters // Add user's custom filters
+            ];
+
+            const query = QueryBuilder.buildAdvancedFilters(filters);
+
+            // Add global search if provided
+            if (search && search.trim()) {
+                const searchFields = [
+                    'stock_id', 'product_id', 'pid', 'shape', 'color', 'clarity',
+                    'cut', 'polish', 'symmetry', 'fluorescence', 'laboratory',
+                    'certificate_number', 'growth_type', 'fancy_color',
+                    'fancy_color_intensity', 'fancy_color_overtone', 'measurements'
+                ];
+                const searchQuery = QueryBuilder.buildGlobalSearch(search, searchFields);
+                if (searchQuery) {
+                    Object.assign(query, searchQuery);
+                }
+            }
+
+            const sortObject = QueryBuilder.buildSort(sortBy, sortOrder);
+
+            const products = await Product.find(query)
+                .sort(sortObject)
                 .skip(skip)
                 .limit(limit);
 
-            const totalProducts = await Product.countDocuments({ seller_id: req.user._id });
+            const totalProducts = await Product.countDocuments(query);
 
             return res.status(200).json({
                 status: true,
@@ -219,42 +214,24 @@ export class ApiController {
                         per_page: limit,
                         total: totalProducts,
                         total_pages: Math.ceil(totalProducts / limit)
-                    }
+                    },
+                    appliedFilters: userFilters,
+                    search: search || undefined
                 }
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'index',
-                errorMsg: `Products retrieval failed: ${error.message}`
-            });
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
-            });
+            return this.handleError(res, error, 'index', req.user?._id || 'unknown');
         }
     }
 
     // Get single product by ID or PID
     public async show(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const { id } = req.params;
-            
-            let product = await Product.findOne({
-                $and: [
-                    { seller_id: req.user._id },
-                    { $or: [{ _id: id }, { pid: id }] }
-                ]
-            });
+            const product = await this.findUserProduct(req.user._id, id);
 
             if (!product) {
                 return res.status(404).json({
@@ -270,44 +247,23 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'show',
-                errorMsg: `Product retrieval failed: ${error.message}`
-            });
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
-            });
+            return this.handleError(res, error, 'show', req.user?._id || 'unknown');
         }
     }
 
     // Update product
     public async update(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const { id } = req.params;
             let updateData = req.body;
 
             if (updateData.field && updateData.value !== undefined) {
-                // Transform single field update format
                 updateData = { [updateData.field]: updateData.value };
             }
 
-            // Find the product
-            const product = await Product.findOne({
-                $and: [
-                    { seller_id: req.user._id },
-                    { $or: [{ _id: id }, { pid: id }] }
-                ]
-            });
+            const product = await this.findUserProduct(req.user._id, id);
 
             if (!product) {
                 return res.status(404).json({
@@ -330,11 +286,9 @@ export class ApiController {
                     });
                 }
 
-                // Update product_id if stock_id is changing
                 updateData.product_id = `${req.user.uid}_${updateData.stock_id}`;
             }
 
-            // Update the product
             Object.assign(product, updateData);
             await product.save();
 
@@ -351,99 +305,36 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'update',
-                errorMsg: `Product update failed: ${error.message}`
-            });
-
-            // Handle MongoDB duplicate key error
-            if (error.code === 11000 || error.name === 'MongoServerError') {
-                const field = Object.keys(error.keyPattern || {})[0] || 'field';
-                return res.status(409).json({
-                    status: false,
-                    message: `Duplicate ${field}: This value already exists`
-                });
-            }
-
-            // Handle validation errors
-            if (error.name === 'ValidationError') {
-                const errors: Record<string, string> = {};
-                for (const field in error.errors) {
-                    errors[field] = error.errors[field].message;
-                }
-                return res.status(422).json({
-                    status: false,
-                    message: 'Validation failed',
-                    errors
-                });
-            }
-
-            // Handle cast errors (invalid ObjectId, etc.)
-            if (error.name === 'CastError') {
-                return res.status(400).json({
-                    status: false,
-                    message: `Invalid ${error.path}: ${error.value}`
-                });
-            }
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
-            });
+            return this.handleError(res, error, 'update', req.user?._id || 'unknown');
         }
     }
 
+    // Delete product(s)
     public async destroy(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const { id } = req.params;
-
-            // Check if multiple IDs are provided (comma-separated)
             const ids = id.includes(',') ? id.split(',').map(i => i.trim()) : [id];
 
             const deletedProducts = [];
             const notFoundProducts = [];
 
             for (const productId of ids) {
-                try {
-                    // Find the product
-                    const product = await Product.findOne({
-                        $and: [
-                            { seller_id: req.user._id },
-                            { $or: [{ _id: productId }, { pid: productId }] }
-                        ]
-                    });
+                const product = await this.findUserProduct(req.user._id, productId);
 
-                    if (!product) {
-                        notFoundProducts.push(productId);
-                        continue;
-                    }
-
-                    // Delete the product
-                    await Product.findByIdAndDelete(product._id);
-                    deletedProducts.push({
-                        id: product._id,
-                        pid: product.pid,
-                        product_id: product.product_id,
-                        stock_id: product.stock_id
-                    });
-
-                } catch (error: any) {
-                    logError({
-                        userId: req.user._id,
-                        functionName: 'destroy',
-                        errorMsg: `Failed to delete product ${productId}: ${error.message}`
-                    });
+                if (!product) {
                     notFoundProducts.push(productId);
+                    continue;
                 }
+
+                await Product.findByIdAndDelete(product._id);
+                deletedProducts.push({
+                    id: product._id,
+                    pid: product.pid,
+                    product_id: product.product_id,
+                    stock_id: product.stock_id
+                });
             }
 
             logSuccess({
@@ -464,105 +355,9 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'destroy',
-                errorMsg: `Product deletion failed: ${error.message}`
-            });
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
-            });
+            return this.handleError(res, error, 'destroy', req.user?._id || 'unknown');
         }
     }
-
-    // Bulk delete products (POST request with array of IDs)
-    // public async bulkDestroy(req: Request, res: Response): Promise<Response> {
-    //     try {
-    //         if (!req.user) {
-    //             return res.status(401).json({
-    //                 status: false,
-    //                 message: 'Authentication required'
-    //             });
-    //         }
-
-    //         const { ids } = req.body;
-
-    //         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    //             return res.status(400).json({
-    //                 status: false,
-    //                 message: 'Product IDs array is required'
-    //             });
-    //         }
-
-    //         const deletedProducts = [];
-    //         const notFoundProducts = [];
-
-    //         for (const productId of ids) {
-    //             try {
-    //                 // Find the product
-    //                 const product = await Product.findOne({
-    //                     $and: [
-    //                         { seller_id: req.user._id },
-    //                         { $or: [{ _id: productId }, { pid: productId }] }
-    //                     ]
-    //                 });
-
-    //                 if (!product) {
-    //                     notFoundProducts.push(productId);
-    //                     continue;
-    //                 }
-
-    //                 // Delete the product
-    //                 await Product.findByIdAndDelete(product._id);
-    //                 deletedProducts.push({
-    //                     id: product._id,
-    //                     pid: product.pid,
-    //                     product_id: product.product_id,
-    //                     stock_id: product.stock_id
-    //                 });
-
-    //             } catch (error: any) {
-    //                 logError({
-    //                     userId: req.user._id,
-    //                     functionName: 'bulkDestroy',
-    //                     errorMsg: `Failed to delete product ${productId}: ${error.message}`
-    //                 });
-    //                 notFoundProducts.push(productId);
-    //             }
-    //         }
-
-    //         logSuccess({
-    //             userId: req.user._id,
-    //             functionName: 'bulkDestroy',
-    //             successMsg: `Bulk deleted ${deletedProducts.length} products successfully`
-    //         });
-
-    //         return res.status(200).json({
-    //             status: true,
-    //             message: `Successfully deleted ${deletedProducts.length} product(s)`,
-    //             data: {
-    //                 deleted: deletedProducts,
-    //                 not_found: notFoundProducts,
-    //                 total_deleted: deletedProducts.length,
-    //                 total_not_found: notFoundProducts.length
-    //             }
-    //         });
-
-    //     } catch (error: any) {
-    //         logError({
-    //             userId: req.user?._id || 'unknown',
-    //             functionName: 'bulkDestroy',
-    //             errorMsg: `Bulk product deletion failed: ${error.message}`
-    //         });
-
-    //         return res.status(500).json({
-    //             status: false,
-    //             message: 'Internal server error'
-    //         });
-    //     }
-    // }
 
     // Get all active packages
     public async packages(req: Request, res: Response): Promise<Response> {
@@ -578,29 +373,14 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'packages',
-                errorMsg: `Package retrieval failed: ${error.message}`
-            });
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
-            });
+            return this.handleError(res, error, 'packages', req.user?._id || 'unknown');
         }
     }
 
     // Buy a package (create Stripe checkout session)
     public async buy_package(req: Request, res: Response): Promise<Response> {
         try {
-            // Check if user is authenticated
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const package_id = req.query.package_id as string;
 
@@ -611,7 +391,6 @@ export class ApiController {
                 });
             }
 
-            // Find the package
             const packageData = await Package.findById(package_id);
             if (!packageData || !packageData.is_active) {
                 return res.status(404).json({
@@ -620,17 +399,13 @@ export class ApiController {
                 });
             }
 
-            // Check if user already has an active package
             const user = req.user;
-            if (user.package?.end_date) {
-                const today = new Date();
-                const packEndDate = new Date(user.package?.end_date);
-                if (packEndDate > today) {
-                    return res.status(400).json({
-                        status: false,
-                        message: 'You already have an active package. Please wait for it to expire before purchasing a new one.'
-                    });
-                }
+            const packageCheck = this.hasActivePackage(user);
+            if (packageCheck.valid) {
+                return res.status(400).json({
+                    status: false,
+                    message: 'You already have an active package. Please wait for it to expire before purchasing a new one.'
+                });
             }
 
             // Create Stripe checkout session
@@ -647,10 +422,8 @@ export class ApiController {
 
             const session = await StripeService.createCheckoutSession(checkoutData);
 
-            // Generate unique payment ID
-            const paymentId = (PaymentLog as any).generatePaymentId();
-
             // Log payment attempt
+            const paymentId = (PaymentLog as any).generatePaymentId();
             const paymentLog = new PaymentLog({
                 user_id: user._id,
                 pack_id: packageData._id,
@@ -688,42 +461,25 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'buy_package',
-                errorMsg: `Package purchase failed: ${error.message}`
-            });
-
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
-            });
+            return this.handleError(res, error, 'buy_package', req.user?._id || 'unknown');
         }
     }
 
     // Get user's package history
     public async package_history(req: Request, res: Response): Promise<Response> {
         try {
-            if (!req.user) {
-                return res.status(401).json({
-                    status: false,
-                    message: 'Authentication required'
-                });
-            }
+            if (!this.checkAuth(req, res)) return res;
 
             const user = req.user;
 
-            // Get user's active packages
             const activePackages = await PackActive.find({ user_id: user._id })
                 .populate('pack_id', 'name description price amount pack_type features')
                 .sort({ activated_at: -1 });
 
-            // Get payment history
             const paymentHistory = await PaymentLog.find({ user_id: user._id })
                 .populate('pack_id', 'name description')
                 .sort({ createdAt: -1 });
 
-            // Get current active package info
             let currentPackage = null;
             if (user.package?.end_date) {
                 const today = new Date();
@@ -747,16 +503,132 @@ export class ApiController {
             });
 
         } catch (error: any) {
-            logError({
-                userId: req.user?._id || 'unknown',
-                functionName: 'package_history',
-                errorMsg: `Package history retrieval failed: ${error.message}`
+            return this.handleError(res, error, 'package_history', req.user?._id || 'unknown');
+        }
+    }
+
+    // Get all products from users with active packages (PUBLIC ROUTE)
+    public async getPublicProducts(req: Request, res: Response): Promise<Response> {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 20;
+            const skip = (page - 1) * limit;
+
+            const { filters: advancedFilters = [], search, sortBy = 'createdAt', sortOrder = 'desc' } = req.body || {};
+
+            // Get users with valid active packages
+            const today = new Date();
+            const usersWithActivePackages = await (await import('../models/User.model.js')).default.find({
+                'package.end_date': { $gte: today },
+                approval_status: 'approved',
+                is_active: true
+            }).select('_id');
+
+            const userIds = usersWithActivePackages.map(user => user._id);
+
+            if (userIds.length === 0) {
+                return res.status(200).json({
+                    status: true,
+                    message: 'No products found from users with active packages',
+                    data: {
+                        products: [],
+                        pagination: { current_page: page, per_page: limit, total: 0, total_pages: 0 },
+                        filters: this.getEmptyFilterOptions(),
+                        total_active_sellers: 0
+                    }
+                });
+            }
+
+            // Build query using QueryBuilder
+            const baseFilter = { seller_id: { $in: userIds } };
+            const advancedFilterQuery = QueryBuilder.buildAdvancedFilters(advancedFilters);
+            
+            const searchFields = [
+                'stock_id', 'product_id', 'pid', 'shape', 'color', 'clarity',
+                'cut', 'polish', 'symmetry', 'fluorescence', 'laboratory',
+                'growth_type', 'certificate_number', 'fancy_color',
+                'fancy_color_intensity', 'fancy_color_overtone', 'seller_name',
+                'seller_company', 'seller_location', 'seller_email', 'measurements'
+            ];
+            const searchQuery = QueryBuilder.buildGlobalSearch(search, searchFields);
+            
+            const filter = QueryBuilder.mergeFilters(baseFilter, advancedFilterQuery, searchQuery || {});
+            const sortObject = QueryBuilder.buildSort(sortBy, sortOrder);
+
+            // Get products
+            const products = await Product.find(filter)
+                .populate('seller_id', 'name company_name uid email phone_no whatsapp_no location')
+                .sort(sortObject)
+                .skip(skip)
+                .limit(limit)
+                .lean();
+
+            const totalProducts = await Product.countDocuments(filter);
+
+            // Get filter options
+            const allProducts = await Product.find({ seller_id: { $in: userIds } }).lean();
+            const filterOptions = this.buildFilterOptions(allProducts);
+
+            logSuccess({
+                userId: 'public',
+                functionName: 'getPublicProducts',
+                successMsg: `Retrieved ${products.length} products from ${userIds.length} users`
             });
 
-            return res.status(500).json({
-                status: false,
-                message: 'Internal server error'
+            return res.status(200).json({
+                status: true,
+                message: 'Products retrieved successfully',
+                data: {
+                    products,
+                    pagination: {
+                        current_page: page,
+                        per_page: limit,
+                        total: totalProducts,
+                        total_pages: Math.ceil(totalProducts / limit)
+                    },
+                    filters: filterOptions,
+                    total_active_sellers: userIds.length
+                }
             });
+
+        } catch (error: any) {
+            return this.handleError(res, error, 'getPublicProducts', 'public');
         }
+    }
+
+    private buildFilterOptions(products: any[]) {
+        return {
+            available_shapes: QueryBuilder.getUniqueValues(products, 'shape'),
+            available_colors: QueryBuilder.getUniqueValues(products, 'color'),
+            available_clarities: QueryBuilder.getUniqueValues(products, 'clarity'),
+            available_cuts: QueryBuilder.getUniqueValues(products, 'cut'),
+            available_polish: QueryBuilder.getUniqueValues(products, 'polish'),
+            available_symmetry: QueryBuilder.getUniqueValues(products, 'symmetry'),
+            available_fluorescence: QueryBuilder.getUniqueValues(products, 'fluorescence'),
+            available_laboratories: QueryBuilder.getUniqueValues(products, 'laboratory'),
+            available_growth_types: QueryBuilder.getUniqueValues(products, 'growth_type'),
+            price_range: QueryBuilder.getRange(products, 'total_price'),
+            carat_range: QueryBuilder.getRange(products, 'carat'),
+            depth_range: QueryBuilder.getRange(products, 'depth_percentage'),
+            table_range: QueryBuilder.getRange(products, 'table_percentage')
+        };
+    }
+
+    private getEmptyFilterOptions() {
+        return {
+            available_shapes: [],
+            available_colors: [],
+            available_clarities: [],
+            available_cuts: [],
+            available_polish: [],
+            available_symmetry: [],
+            available_fluorescence: [],
+            available_laboratories: [],
+            available_growth_types: [],
+            price_range: { min: 0, max: 0 },
+            carat_range: { min: 0, max: 0 },
+            depth_range: { min: 0, max: 0 },
+            table_range: { min: 0, max: 0 }
+        };
     }
 }
