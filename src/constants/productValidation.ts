@@ -35,7 +35,7 @@ export const ALLOWED_CUT_POLISH_SYMMETRY = [
 ] as const;
 
 export const ALLOWED_FANCY_COLOR_INTENSITY = [
-    'Faint', 'Very Light', 'Fancy Light', 'Light', 'Fancy', 'Dark Fancy', 
+    'None', 'Faint', 'Very Light', 'Fancy Light', 'Light', 'Fancy', 'Dark Fancy', 
     'Fancy Intense', 'Fancy Deep', 'Other'
 ] as const;
 

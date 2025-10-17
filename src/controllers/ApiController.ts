@@ -157,9 +157,32 @@ export class ApiController {
                 errorMsg: `Product creation failed: ${error.message}`
             });
 
+            // Handle MongoDB duplicate key error
+            if (error.code === 11000 || error.name === 'MongoServerError') {
+                const field = Object.keys(error.keyPattern || {})[0] || 'field';
+                return res.status(409).json({
+                    status: false,
+                    message: `Duplicate ${field}: This value already exists`
+                });
+            }
+
+            // Handle validation errors
+            if (error.name === 'ValidationError') {
+                const errors: Record<string, string> = {};
+                for (const field in error.errors) {
+                    errors[field] = error.errors[field].message;
+                }
+                return res.status(422).json({
+                    status: false,
+                    message: 'Validation failed',
+                    errors
+                });
+            }
+
             return res.status(500).json({
                 status: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
@@ -271,7 +294,12 @@ export class ApiController {
             }
 
             const { id } = req.params;
-            const updateData = req.body;
+            let updateData = req.body;
+
+            if (updateData.field && updateData.value !== undefined) {
+                // Transform single field update format
+                updateData = { [updateData.field]: updateData.value };
+            }
 
             // Find the product
             const product = await Product.findOne({
@@ -286,6 +314,24 @@ export class ApiController {
                     status: false,
                     message: 'Product not found'
                 });
+            }
+
+            if (updateData.stock_id && updateData.stock_id !== product.stock_id) {
+                const duplicateStock = await Product.findOne({
+                    seller_id: req.user._id,
+                    stock_id: updateData.stock_id,
+                    _id: { $ne: product._id }
+                });
+
+                if (duplicateStock) {
+                    return res.status(409).json({
+                        status: false,
+                        message: 'Stock ID already exists for another product'
+                    });
+                }
+
+                // Update product_id if stock_id is changing
+                updateData.product_id = `${req.user.uid}_${updateData.stock_id}`;
             }
 
             // Update the product
@@ -311,14 +357,44 @@ export class ApiController {
                 errorMsg: `Product update failed: ${error.message}`
             });
 
+            // Handle MongoDB duplicate key error
+            if (error.code === 11000 || error.name === 'MongoServerError') {
+                const field = Object.keys(error.keyPattern || {})[0] || 'field';
+                return res.status(409).json({
+                    status: false,
+                    message: `Duplicate ${field}: This value already exists`
+                });
+            }
+
+            // Handle validation errors
+            if (error.name === 'ValidationError') {
+                const errors: Record<string, string> = {};
+                for (const field in error.errors) {
+                    errors[field] = error.errors[field].message;
+                }
+                return res.status(422).json({
+                    status: false,
+                    message: 'Validation failed',
+                    errors
+                });
+            }
+
+            // Handle cast errors (invalid ObjectId, etc.)
+            if (error.name === 'CastError') {
+                return res.status(400).json({
+                    status: false,
+                    message: `Invalid ${error.path}: ${error.value}`
+                });
+            }
+
             return res.status(500).json({
                 status: false,
-                message: 'Internal server error'
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
             });
         }
     }
 
-    // Delete product
     public async destroy(req: Request, res: Response): Promise<Response> {
         try {
             if (!req.user) {
@@ -330,33 +406,61 @@ export class ApiController {
 
             const { id } = req.params;
 
-            // Find the product
-            const product = await Product.findOne({
-                $and: [
-                    { seller_id: req.user._id },
-                    { $or: [{ _id: id }, { pid: id }] }
-                ]
-            });
+            // Check if multiple IDs are provided (comma-separated)
+            const ids = id.includes(',') ? id.split(',').map(i => i.trim()) : [id];
 
-            if (!product) {
-                return res.status(404).json({
-                    status: false,
-                    message: 'Product not found'
-                });
+            const deletedProducts = [];
+            const notFoundProducts = [];
+
+            for (const productId of ids) {
+                try {
+                    // Find the product
+                    const product = await Product.findOne({
+                        $and: [
+                            { seller_id: req.user._id },
+                            { $or: [{ _id: productId }, { pid: productId }] }
+                        ]
+                    });
+
+                    if (!product) {
+                        notFoundProducts.push(productId);
+                        continue;
+                    }
+
+                    // Delete the product
+                    await Product.findByIdAndDelete(product._id);
+                    deletedProducts.push({
+                        id: product._id,
+                        pid: product.pid,
+                        product_id: product.product_id,
+                        stock_id: product.stock_id
+                    });
+
+                } catch (error: any) {
+                    logError({
+                        userId: req.user._id,
+                        functionName: 'destroy',
+                        errorMsg: `Failed to delete product ${productId}: ${error.message}`
+                    });
+                    notFoundProducts.push(productId);
+                }
             }
-
-            // Delete the product
-            await Product.findByIdAndDelete(product._id);
 
             logSuccess({
                 userId: req.user._id,
                 functionName: 'destroy',
-                successMsg: `Product deleted successfully: ${product.product_id}`
+                successMsg: `Deleted ${deletedProducts.length} products successfully`
             });
 
             return res.status(200).json({
                 status: true,
-                message: 'Product deleted successfully'
+                message: `Successfully deleted ${deletedProducts.length} product(s)`,
+                data: {
+                    deleted: deletedProducts,
+                    not_found: notFoundProducts,
+                    total_deleted: deletedProducts.length,
+                    total_not_found: notFoundProducts.length
+                }
             });
 
         } catch (error: any) {
@@ -372,6 +476,93 @@ export class ApiController {
             });
         }
     }
+
+    // Bulk delete products (POST request with array of IDs)
+    // public async bulkDestroy(req: Request, res: Response): Promise<Response> {
+    //     try {
+    //         if (!req.user) {
+    //             return res.status(401).json({
+    //                 status: false,
+    //                 message: 'Authentication required'
+    //             });
+    //         }
+
+    //         const { ids } = req.body;
+
+    //         if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    //             return res.status(400).json({
+    //                 status: false,
+    //                 message: 'Product IDs array is required'
+    //             });
+    //         }
+
+    //         const deletedProducts = [];
+    //         const notFoundProducts = [];
+
+    //         for (const productId of ids) {
+    //             try {
+    //                 // Find the product
+    //                 const product = await Product.findOne({
+    //                     $and: [
+    //                         { seller_id: req.user._id },
+    //                         { $or: [{ _id: productId }, { pid: productId }] }
+    //                     ]
+    //                 });
+
+    //                 if (!product) {
+    //                     notFoundProducts.push(productId);
+    //                     continue;
+    //                 }
+
+    //                 // Delete the product
+    //                 await Product.findByIdAndDelete(product._id);
+    //                 deletedProducts.push({
+    //                     id: product._id,
+    //                     pid: product.pid,
+    //                     product_id: product.product_id,
+    //                     stock_id: product.stock_id
+    //                 });
+
+    //             } catch (error: any) {
+    //                 logError({
+    //                     userId: req.user._id,
+    //                     functionName: 'bulkDestroy',
+    //                     errorMsg: `Failed to delete product ${productId}: ${error.message}`
+    //                 });
+    //                 notFoundProducts.push(productId);
+    //             }
+    //         }
+
+    //         logSuccess({
+    //             userId: req.user._id,
+    //             functionName: 'bulkDestroy',
+    //             successMsg: `Bulk deleted ${deletedProducts.length} products successfully`
+    //         });
+
+    //         return res.status(200).json({
+    //             status: true,
+    //             message: `Successfully deleted ${deletedProducts.length} product(s)`,
+    //             data: {
+    //                 deleted: deletedProducts,
+    //                 not_found: notFoundProducts,
+    //                 total_deleted: deletedProducts.length,
+    //                 total_not_found: notFoundProducts.length
+    //             }
+    //         });
+
+    //     } catch (error: any) {
+    //         logError({
+    //             userId: req.user?._id || 'unknown',
+    //             functionName: 'bulkDestroy',
+    //             errorMsg: `Bulk product deletion failed: ${error.message}`
+    //         });
+
+    //         return res.status(500).json({
+    //             status: false,
+    //             message: 'Internal server error'
+    //         });
+    //     }
+    // }
 
     // Get all active packages
     public async packages(req: Request, res: Response): Promise<Response> {

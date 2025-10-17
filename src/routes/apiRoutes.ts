@@ -25,12 +25,10 @@ router.get('/products/:id',
 );
 
 // PUT /api/products/:id - Update product
-router.put('/products/:id', 
+router.put('/update_product/:id', 
   validateProductUpdate,
   (req: Request, res: Response) => apiController.update(req, res)
 );
-
-// DELETE /api/products/:id - Delete product
 router.delete('/delete_product/:id', 
   (req: Request, res: Response) => apiController.destroy(req, res)
 );

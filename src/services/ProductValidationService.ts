@@ -205,6 +205,9 @@ function prepareProductData(row: IExcelRow, sellerId: string, userUid: string) {
         fancy_color: row.Fancy_Color?.toString().trim() || 'None',
         fancy_color_intensity: row.Fancy_Color_Intensity?.toString().trim() || 'None',
         fancy_color_overtone: row.Fancy_Color_Overtone?.toString().trim() || 'None',
+        video_url: row.Video_URL?.toString().trim() || '',
+        image_url: row.Image_URL?.toString().trim() || '',
+        certificate_url: row.Certificate_URL?.toString().trim() || '',
         seller_id: sellerId
     };
 }

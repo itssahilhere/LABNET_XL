@@ -196,7 +196,10 @@ export const validateProductCreation = (req: Request, res: Response, next: NextF
 
 export const validateProductUpdate = (req: Request, res: Response, next: NextFunction) => {
     const errors: { [key: string]: string[] } = {};
-    const data: Partial<IProductCreateRequest> = req.body;
+    let data: Partial<IProductCreateRequest> = req.body;
+    if (req.body.field && req.body.value !== undefined) {
+        data = { [req.body.field]: req.body.value } as Partial<IProductCreateRequest>;
+    }
 
     // Validate enum fields if provided
     if (data.shape && !(ALLOWED_SHAPES as readonly string[]).includes(data.shape)) {
