@@ -11,7 +11,7 @@ export interface IUser extends Document {
   show_pass: string;
   uid: string;
   vat_number: string;
-  id_proof?: string;
+  id_proof: string;
   package?: {
     id?: mongoose.Types.ObjectId;
     start_date?: Date;

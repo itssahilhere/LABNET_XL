@@ -29,6 +29,7 @@ export class UserController {
             if (!data.password) errors.push('Password is required');
             if (!data.phone_number) errors.push('Phone number is required');
             if (!data.vat_number) errors.push('VAT number is required');
+            if (!data.id_proof) errors.push('ID proof is required');
 
             if (errors.length > 0) {
                 return sendErrorResponse(res, ErrorResponses.VALIDATION_ERROR(errors.join(', ')));

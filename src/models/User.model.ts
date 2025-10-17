@@ -55,6 +55,7 @@ const userSchema: Schema<IUser> = new Schema({
     },
     id_proof: {
         type: String,
+        required: true,
         trim: true
     },
     package: {
