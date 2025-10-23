@@ -183,6 +183,7 @@ userSchema.statics.createDefaultAdmin = async function (): Promise<IUser> {
     role: 'admin',
     approval_status: 'approved',
     vat_number: 'ADMIN001',
+    id_proof: 'ADMIN_ID_PROOF',
     is_active: 1,
   });
 
